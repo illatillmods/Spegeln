@@ -1,0 +1,1060 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  CITIZEN
+  JOURNALIST
+  ANALYST
+  ADMIN
+}
+
+enum SubscriptionTier {
+  FREE
+  PLUS
+  PRO
+  CIVIC_LAB
+}
+
+enum AuthProvider {
+  EMAIL
+  GOOGLE
+  GITHUB
+  ANONYMOUS
+}
+
+enum MonitoringCadence {
+  DAILY
+  HOURLY
+  REALTIME
+}
+
+enum SourceKind {
+  PUBLIC_REGISTRY
+  COURT_RECORD
+  PROCUREMENT
+  NEWS
+  FOI_RESPONSE
+  TIP
+  ARCHIVE
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ReportStatus {
+  DRAFT
+  FACT_CHECK
+  LEGAL_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LegalReviewStatus {
+  PENDING
+  APPROVED
+  CHANGES_REQUIRED
+  BLOCKED
+}
+
+enum TipStatus {
+  RECEIVED
+  MODERATED
+  ESCALATED
+  DISMISSED
+}
+
+enum AuthorityCategory {
+  AGENCY
+  MUNICIPALITY
+  REGION
+  COURT
+  POLICE
+  REGULATOR
+  MINISTRY
+  PUBLIC_COMPANY
+  OTHER
+}
+
+enum ComplaintStatus {
+  SUBMITTED
+  ACKNOWLEDGED
+  RESPONDED
+  RESOLVED
+  DISMISSED
+}
+
+enum InvestigationStatus {
+  DRAFT
+  ACTIVE
+  REPORTED
+  CLOSED
+}
+
+enum LeaderboardWindow {
+  WEEKLY
+  MONTHLY
+  ALL_TIME
+}
+
+enum ApiConsumerStatus {
+  ACTIVE
+  REVOKED
+}
+
+enum AiJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum IntakeLifecycleStatus {
+  RECEIVED
+  AI_TRIAGED
+  MODERATION
+  LEGAL_REVIEW
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+enum EvidenceAssetKind {
+  TEXT
+  IMAGE
+  DOCUMENT
+  VIDEO
+  AUDIO
+}
+
+enum SeverityLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ModerationDecision {
+  PENDING
+  APPROVED
+  CHANGES_REQUIRED
+  REJECTED
+  ESCALATED
+}
+
+enum TrustVoteDirection {
+  UP
+  DOWN
+}
+
+enum WikiPageStatus {
+  DRAFT
+  PUBLISHED
+  LOCKED
+  ARCHIVED
+}
+
+enum AppealAutomationStatus {
+  RECEIVED
+  PARSED
+  DRAFTED
+  SUBMITTED
+  RESPONDED
+  FAILED
+}
+
+enum AppealArtifactKind {
+  APPEAL
+  COMPLAINT
+  DOCUMENT_REQUEST
+}
+
+enum VideoRedactionStatus {
+  QUEUED
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum MassAppealType {
+  JO
+  GDPR
+  INFO
+  KLAGOMAL
+}
+
+enum MassAppealBillingModel {
+  PAYG
+  SUBSCRIPTION
+}
+
+enum MassAppealUrgency {
+  STANDARD
+  URGENT
+}
+
+enum PrivacyRequestKind {
+  ACCESS
+  EXPORT
+  DELETE
+  RECTIFY
+  OBJECTION
+  RESTRICTION
+}
+
+enum PrivacyRequestStatus {
+  PENDING
+  IN_REVIEW
+  COMPLETED
+  REJECTED
+}
+
+enum PaymentMethodKind {
+  CARD
+  KLARNA
+  SWISH
+  BTC
+  XMR
+  LTC
+  CASH
+}
+
+enum PaymentFlowType {
+  SUBSCRIPTION
+  PAY_PER_USE
+  DONATION
+  API_ACCESS
+}
+
+enum PaymentRequestStatus {
+  PENDING_REVIEW
+  AWAITING_PAYMENT
+  PAID
+  REJECTED
+  EXPIRED
+}
+
+enum BetaFeedbackStatus {
+  RECEIVED
+  TRIAGED
+  ACTIONED
+  ARCHIVED
+}
+
+model User {
+  id               String            @id @default(cuid())
+  email            String            @unique
+  passwordHash     String?
+  name             String?
+  publicAlias      String?           @unique
+  countryCode      String?           @default("SE")
+  locale           String?           @default("sv-SE")
+  preferredLanguage String           @default("sv")
+  authProvider     AuthProvider      @default(EMAIL)
+  isAnonymous      Boolean           @default(false)
+  emailVerifiedAt  DateTime?
+  privacyConsentAt DateTime?
+  termsAcceptedAt  DateTime?
+  marketingConsent Boolean           @default(false)
+  role             Role              @default(CITIZEN)
+  subscriptionTier SubscriptionTier  @default(FREE)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  watches          Watch[]
+  reports          Report[]
+  tips             PublicTip[]
+  usageRecords     UsageRecord[]
+  auditEvents      AuditEvent[]
+  massAppealBatches MassAppealBatch[]
+  complaints       Complaint[]       @relation("ComplaintAuthor")
+  apiConsumers     ApiConsumer[]
+  aiJobs           AiAnalysisJob[]
+  complaintVotes   ComplaintVote[]
+  investigationEndorsements InvestigationEndorsement[]
+  investigationsLed Investigation[]  @relation("InvestigationLead")
+  leaderboardSnapshots LeaderboardSnapshot[]
+  authorityFailureReports AuthorityFailureReport[] @relation("FailureReportSubmitter")
+  confidenceVotes   OfficialConfidenceVote[]
+  wikiRevisions     LoopholeWikiRevision[]
+  wikiVotes         LoopholeWikiVote[]
+  appealAutomationJobs AutomatedAppealJob[]
+  privacyRequests   PrivacyRequest[]
+  consentEvents     PrivacyConsentEvent[]
+  paymentRequests   PaymentRequest[]
+  betaFeedbackEntries BetaFeedback[]
+}
+
+model Authority {
+  id        String             @id @default(cuid())
+  name      String
+  slug      String             @unique
+  level     String
+  region    String?
+  regionCode String?
+  countryCode String           @default("SE")
+  category  AuthorityCategory  @default(AGENCY)
+  summary   String?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  officials Official[]
+  sources   MonitoringSource[]
+  watches   Watch[]
+  reports   Report[]
+  alerts    Alert[]
+  tips      PublicTip[]
+  complaints Complaint[]
+  investigations Investigation[]
+  scorecards AuthorityScorecard[]
+  aiJobs    AiAnalysisJob[]
+  failureReports AuthorityFailureReport[]
+  confidenceVotes OfficialConfidenceVote[]
+  testimonials ConfidenceTestimonial[]
+  surveillanceSubmissions ReverseSurveillanceSubmission[]
+  automatedAppealJobs AutomatedAppealJob[]
+
+  @@index([countryCode, regionCode])
+  @@index([category, createdAt])
+}
+
+model Official {
+  id          String    @id @default(cuid())
+  fullName    String
+  title       String
+  riskNote    String?
+  authorityId String
+  countryCode String    @default("SE")
+  regionCode  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  authority   Authority @relation(fields: [authorityId], references: [id], onDelete: Cascade)
+  complaints  Complaint[]
+  failureReports AuthorityFailureReport[]
+  confidenceVotes OfficialConfidenceVote[]
+  testimonials ConfidenceTestimonial[]
+  surveillanceSubmissions ReverseSurveillanceSubmission[]
+  automatedAppealJobs AutomatedAppealJob[]
+
+  @@index([authorityId])
+}
+
+model MonitoringSource {
+  id             String      @id @default(cuid())
+  name           String
+  sourceKind     SourceKind
+  baseUrl        String?
+  description    String?
+  legalBasisNote String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  authorities    Authority[]
+}
+
+model Watch {
+  id           String            @id @default(cuid())
+  userId       String
+  authorityId  String
+  cadence      MonitoringCadence @default(DAILY)
+  notes        String?
+  alertsEnabled Boolean          @default(true)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  authority    Authority         @relation(fields: [authorityId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, authorityId])
+  @@index([authorityId])
+}
+
+model Alert {
+  id         String        @id @default(cuid())
+  authorityId String
+  reportId   String?
+  severity   AlertSeverity
+  title      String
+  summary    String
+  detectedAt DateTime      @default(now())
+  authority  Authority     @relation(fields: [authorityId], references: [id], onDelete: Cascade)
+  report     Report?       @relation(fields: [reportId], references: [id])
+
+  @@index([authorityId, detectedAt])
+}
+
+model Report {
+  id           String         @id @default(cuid())
+  title        String
+  slug         String         @unique
+  summary      String
+  bodyMarkdown String?
+  status       ReportStatus   @default(DRAFT)
+  authorityId  String
+  authorId     String
+  publishedAt  DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  authority    Authority      @relation(fields: [authorityId], references: [id], onDelete: Cascade)
+  author       User           @relation(fields: [authorId], references: [id])
+  alerts       Alert[]
+  legalReview  LegalReview?
+  complaintMentions Complaint[] @relation("ComplaintPublicReport")
+  investigationMentions Investigation[] @relation("InvestigationPublicReport")
+  failureReportMentions AuthorityFailureReport[]
+
+  @@index([authorityId, status])
+}
+
+model LegalReview {
+  id               String            @id @default(cuid())
+  reportId         String            @unique
+  status           LegalReviewStatus @default(PENDING)
+  reviewer         String?
+  notes            String?
+  nextCheckpointAt DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  report           Report            @relation(fields: [reportId], references: [id], onDelete: Cascade)
+}
+
+model PublicTip {
+  id                  String     @id @default(cuid())
+  summary             String
+  details             String?
+  authorityId         String?
+  authorId            String?
+  status              TipStatus  @default(RECEIVED)
+  consentToProcessing Boolean    @default(false)
+  containsSensitiveData Boolean  @default(false)
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  authority           Authority? @relation(fields: [authorityId], references: [id])
+  author              User?      @relation(fields: [authorId], references: [id])
+
+  @@index([status, createdAt])
+}
+
+model Complaint {
+  id                String          @id @default(cuid())
+  authorityId       String
+  officialId        String?
+  authorId          String?
+  publicReportId    String?
+  countryCode       String          @default("SE")
+  regionCode        String?
+  title             String
+  summary           String
+  details           String?
+  status            ComplaintStatus @default(SUBMITTED)
+  officialResponseAt DateTime?
+  resolvedAt        DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  authority         Authority       @relation(fields: [authorityId], references: [id], onDelete: Cascade)
+  official          Official?       @relation(fields: [officialId], references: [id], onDelete: SetNull)
+  author            User?           @relation("ComplaintAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  publicReport      Report?         @relation("ComplaintPublicReport", fields: [publicReportId], references: [id], onDelete: SetNull)
+  votes             ComplaintVote[]
+
+  @@index([authorityId, status, createdAt])
+  @@index([countryCode, regionCode, createdAt])
+}
+
+model ComplaintVote {
+  id          String    @id @default(cuid())
+  complaintId String
+  userId      String
+  createdAt   DateTime  @default(now())
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([complaintId, userId])
+  @@index([userId, createdAt])
+}
+
+model Investigation {
+  id               String               @id @default(cuid())
+  authorityId      String
+  leadUserId       String?
+  publicReportId   String?
+  countryCode      String               @default("SE")
+  regionCode       String?
+  title            String
+  summary          String
+  methodologyNote  String?
+  status           InvestigationStatus  @default(DRAFT)
+  publishedAt      DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  authority        Authority            @relation(fields: [authorityId], references: [id], onDelete: Cascade)
+  leadUser         User?                @relation("InvestigationLead", fields: [leadUserId], references: [id], onDelete: SetNull)
+  publicReport     Report?              @relation("InvestigationPublicReport", fields: [publicReportId], references: [id], onDelete: SetNull)
+  endorsements     InvestigationEndorsement[]
+
+  @@index([authorityId, status, createdAt])
+  @@index([countryCode, regionCode, createdAt])
+}
+
+model InvestigationEndorsement {
+  id              String        @id @default(cuid())
+  investigationId String
+  userId          String
+  createdAt       DateTime      @default(now())
+  investigation   Investigation @relation(fields: [investigationId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([investigationId, userId])
+  @@index([userId, createdAt])
+}
+
+model LeaderboardSnapshot {
+  id                      String            @id @default(cuid())
+  userId                  String
+  window                  LeaderboardWindow
+  windowStart             DateTime
+  windowEnd               DateTime
+  rank                    Int
+  score                   Int
+  complaintsWithResponse  Int               @default(0)
+  investigationsReported  Int               @default(0)
+  peerEndorsements        Int               @default(0)
+  metadata                Json?
+  createdAt               DateTime          @default(now())
+  user                    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, window, windowStart, windowEnd])
+  @@index([window, windowStart, rank])
+}
+
+model AuthorityScorecard {
+  id                    String    @id @default(cuid())
+  authorityId           String
+  windowStart           DateTime
+  windowEnd             DateTime
+  methodologyVersion    String
+  transparencyScore     Int
+  responseTimeScore     Int
+  complaintsScore       Int
+  resolutionScore       Int
+  overallScore          Int
+  explanation           Json
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  authority             Authority @relation(fields: [authorityId], references: [id], onDelete: Cascade)
+
+  @@unique([authorityId, windowStart, windowEnd, methodologyVersion])
+  @@index([overallScore, createdAt])
+}
+
+model ComplaintTemplate {
+  id            String   @id @default(cuid())
+  key           String
+  countryCode   String   @default("SE")
+  regionCode    String?
+  locale        String   @default("sv-SE")
+  title         String
+  bodyMarkdown  String
+  legalNote     String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([key, countryCode, regionCode, locale])
+  @@index([countryCode, locale, isActive])
+}
+
+model ApiConsumer {
+  id               String            @id @default(cuid())
+  userId           String?
+  name             String
+  email            String
+  hashedKey        String            @unique
+  scopes           String[]
+  rateLimitPerHour Int               @default(120)
+  status           ApiConsumerStatus @default(ACTIVE)
+  countryCode      String?           @default("SE")
+  lastUsedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  user             User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  requestStats     ApiRequestStat[]
+
+  @@index([status, createdAt])
+}
+
+model ApiRequestStat {
+  id           String      @id @default(cuid())
+  consumerId   String
+  routeKey     String
+  windowStart  DateTime
+  requestCount Int         @default(0)
+  lastRequestAt DateTime   @default(now())
+  consumer     ApiConsumer @relation(fields: [consumerId], references: [id], onDelete: Cascade)
+
+  @@unique([consumerId, routeKey, windowStart])
+  @@index([windowStart, routeKey])
+}
+
+model AiAnalysisJob {
+  id           String      @id @default(cuid())
+  userId       String?
+  authorityId  String?
+  featureKey   String
+  locale       String      @default("sv-SE")
+  countryCode  String      @default("SE")
+  status       AiJobStatus @default(QUEUED)
+  input        Json
+  output       Json?
+  errorMessage String?
+  createdAt    DateTime    @default(now())
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  user         User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  authority    Authority?  @relation(fields: [authorityId], references: [id], onDelete: SetNull)
+
+  @@index([featureKey, status, createdAt])
+  @@index([authorityId, createdAt])
+}
+
+model UsageRecord {
+  id                String           @id @default(cuid())
+  userId            String
+  featureKey        String
+  units             Int              @default(1)
+  billable          Boolean          @default(false)
+  unitPriceSek      Int?
+  totalPriceSek     Int?
+  metadata          Json?
+  massAppealBatchId String?          @unique
+  periodStart       DateTime
+  periodEnd         DateTime
+  createdAt         DateTime         @default(now())
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  massAppealBatch   MassAppealBatch? @relation(fields: [massAppealBatchId], references: [id], onDelete: SetNull)
+
+  @@index([userId, featureKey, periodStart])
+}
+
+model AuditEvent {
+  id         String   @id @default(cuid())
+  userId     String
+  actorLabel String
+  action     String
+  targetType String
+  targetId   String?
+  ipAddress  String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([action, createdAt])
+}
+
+model PrivacyConsentEvent {
+  id                      String   @id @default(cuid())
+  userId                  String?
+  locale                  String   @default("sv-SE")
+  policyVersion           String
+  acceptedTerms           Boolean  @default(false)
+  acceptedPrivacy         Boolean  @default(false)
+  marketingConsent        Boolean  @default(false)
+  analyticsConsent        Boolean  @default(false)
+  personalizationConsent  Boolean  @default(false)
+  ipAddress               String?
+  createdAt               DateTime @default(now())
+  user                    User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
+
+model PrivacyRequest {
+  id          String               @id @default(cuid())
+  userId      String?
+  email       String
+  requestKind PrivacyRequestKind
+  status      PrivacyRequestStatus @default(PENDING)
+  locale      String               @default("sv-SE")
+  details     String?
+  legalNotes  String?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  resolvedAt  DateTime?
+  user        User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status, requestKind, createdAt])
+  @@index([email, createdAt])
+}
+
+model PaymentRequest {
+  id               String               @id @default(cuid())
+  userId           String?
+  email            String
+  method           PaymentMethodKind
+  flowType         PaymentFlowType
+  status           PaymentRequestStatus @default(PENDING_REVIEW)
+  currency         String               @default("SEK")
+  amountSek        Int
+  discountPercent  Int                  @default(0)
+  finalAmountSek   Int
+  itemLabel        String
+  metadata         Json?
+  complianceNotes  String?
+  paidAt           DateTime?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  user             User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status, method, createdAt])
+  @@index([email, createdAt])
+}
+
+model BetaFeedback {
+  id         String             @id @default(cuid())
+  userId     String?
+  email      String?
+  locale     String             @default("sv-SE")
+  category   String
+  message    String
+  rating     Int?
+  status     BetaFeedbackStatus @default(RECEIVED)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+  user       User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+}
+
+model MassAppealBatch {
+  id             String                  @id @default(cuid())
+  userId         String?
+  senderName     String?
+  senderEmail    String
+  senderRole     String?
+  appealType     MassAppealType
+  region         String
+  subject        String
+  caseReference  String?
+  urgency        MassAppealUrgency
+  billingModel   MassAppealBillingModel
+  priceSek       Int                     @default(0)
+  billingLabel   String
+  deliveryMode   String
+  guardrails     Json
+  requestPayload Json
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+  user           User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  usageRecord    UsageRecord?
+  deliveries     MassAppealDelivery[]
+  documents      MassAppealDocument[]
+  automatedAppeals AutomatedAppealJob[]
+
+  @@index([senderEmail, createdAt])
+  @@index([userId, createdAt])
+}
+
+model MassAppealDocument {
+  id              String          @id @default(cuid())
+  batchId         String
+  recipientId     String
+  recipientName   String
+  title           String
+  subjectLine     String
+  channel         String
+  body            String
+  estimatedFeeSek Int             @default(0)
+  createdAt       DateTime        @default(now())
+  batch           MassAppealBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId])
+}
+
+model MassAppealDelivery {
+  id                    String          @id @default(cuid())
+  batchId               String
+  authorityExternalId   String
+  authorityName         String
+  channel               String
+  endpoint              String
+  status                String
+  trackingCode          String          @unique
+  estimatedResponseDays Int
+  feeSek                Int             @default(0)
+  notes                 Json
+  transport             String
+  providerMessageId     String?
+  deliveredAt           DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  batch                 MassAppealBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId, status])
+  @@index([authorityExternalId, createdAt])
+}
+
+model AuthorityFailureReport {
+  id                      String                @id @default(cuid())
+  authorityId             String?
+  officialId              String?
+  submittedByUserId       String?
+  publicReportId          String?
+  countryCode             String                @default("SE")
+  regionCode              String?
+  anonymousAlias          String?
+  reporterFingerprintHash String?
+  title                   String
+  summary                 String
+  incidentDate            DateTime?
+  lifecycleStatus         IntakeLifecycleStatus @default(RECEIVED)
+  aiSeverity              SeverityLevel         @default(MEDIUM)
+  aiPriorityScore         Int                   @default(0)
+  aiSummary               String?
+  pressReleaseDraft       String?
+  moderationDecision      ModerationDecision    @default(PENDING)
+  legalReviewDecision     ModerationDecision    @default(PENDING)
+  publishedAt             DateTime?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+  authority               Authority?            @relation(fields: [authorityId], references: [id], onDelete: SetNull)
+  official                Official?             @relation(fields: [officialId], references: [id], onDelete: SetNull)
+  submittedByUser         User?                 @relation("FailureReportSubmitter", fields: [submittedByUserId], references: [id], onDelete: SetNull)
+  publicReport            Report?               @relation(fields: [publicReportId], references: [id], onDelete: SetNull)
+  evidenceAssets          EvidenceAsset[]
+  reviewItems             ReviewQueueItem[]
+  linkedSurveillanceSubmissions ReverseSurveillanceSubmission[]
+
+  @@index([lifecycleStatus, aiSeverity, createdAt])
+  @@index([authorityId, createdAt])
+  @@index([countryCode, regionCode, createdAt])
+}
+
+model ReverseSurveillanceSubmission {
+  id                       String                @id @default(cuid())
+  authorityId              String?
+  officialId               String?
+  linkedFailureReportId    String?
+  countryCode              String                @default("SE")
+  regionCode               String?
+  anonymousAlias           String?
+  uploaderFingerprintHash  String?
+  title                    String
+  summary                  String
+  lifecycleStatus          IntakeLifecycleStatus @default(RECEIVED)
+  redactionStatus          VideoRedactionStatus  @default(QUEUED)
+  redactionPolicy          String                @default("bystanders-and-sensitive-persons")
+  sharePack                Json?
+  alertSentAt              DateTime?
+  publishedAt              DateTime?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  authority                Authority?            @relation(fields: [authorityId], references: [id], onDelete: SetNull)
+  official                 Official?             @relation(fields: [officialId], references: [id], onDelete: SetNull)
+  linkedFailureReport      AuthorityFailureReport? @relation(fields: [linkedFailureReportId], references: [id], onDelete: SetNull)
+  evidenceAssets           EvidenceAsset[]
+  reviewItems              ReviewQueueItem[]
+
+  @@index([lifecycleStatus, redactionStatus, createdAt])
+  @@index([authorityId, createdAt])
+}
+
+model EvidenceAsset {
+  id                        String                        @id @default(cuid())
+  failureReportId           String?
+  surveillanceSubmissionId  String?
+  automatedAppealJobId      String?
+  assetKind                 EvidenceAssetKind
+  fileName                  String
+  mimeType                  String
+  byteSize                  Int
+  storageKey                String
+  sha256                    String?
+  extractedText             String?
+  moderationDecision        ModerationDecision            @default(PENDING)
+  redactionStatus           VideoRedactionStatus?
+  redactionNotes            String?
+  createdAt                 DateTime                      @default(now())
+  updatedAt                 DateTime                      @updatedAt
+  failureReport             AuthorityFailureReport?       @relation(fields: [failureReportId], references: [id], onDelete: Cascade)
+  surveillanceSubmission    ReverseSurveillanceSubmission? @relation(fields: [surveillanceSubmissionId], references: [id], onDelete: Cascade)
+  automatedAppealJob        AutomatedAppealJob?           @relation(fields: [automatedAppealJobId], references: [id], onDelete: Cascade)
+
+  @@index([failureReportId, assetKind])
+  @@index([surveillanceSubmissionId, assetKind])
+  @@index([automatedAppealJobId, assetKind])
+}
+
+model ReviewQueueItem {
+  id                        String                @id @default(cuid())
+  failureReportId           String?
+  surveillanceSubmissionId  String?
+  wikiRevisionId            String?
+  targetType                String
+  status                    IntakeLifecycleStatus @default(MODERATION)
+  moderationDecision        ModerationDecision    @default(PENDING)
+  legalDecision             ModerationDecision    @default(PENDING)
+  assignedTo                String?
+  notes                     String?
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
+  failureReport             AuthorityFailureReport? @relation(fields: [failureReportId], references: [id], onDelete: Cascade)
+  surveillanceSubmission    ReverseSurveillanceSubmission? @relation(fields: [surveillanceSubmissionId], references: [id], onDelete: Cascade)
+  wikiRevision              LoopholeWikiRevision? @relation(fields: [wikiRevisionId], references: [id], onDelete: Cascade)
+
+  @@index([status, moderationDecision, createdAt])
+}
+
+model OfficialConfidenceVote {
+  id                    String             @id @default(cuid())
+  authorityId           String?
+  officialId            String?
+  userId                String?
+  countryCode           String             @default("SE")
+  regionCode            String?
+  anonymousAlias        String?
+  voterFingerprintHash  String?
+  direction             TrustVoteDirection
+  createdAt             DateTime           @default(now())
+  authority             Authority?         @relation(fields: [authorityId], references: [id], onDelete: SetNull)
+  official              Official?          @relation(fields: [officialId], references: [id], onDelete: SetNull)
+  user                  User?              @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([officialId, createdAt])
+  @@index([authorityId, createdAt])
+  @@index([countryCode, regionCode, createdAt])
+}
+
+model ConfidenceTestimonial {
+  id                    String             @id @default(cuid())
+  authorityId           String?
+  officialId            String?
+  countryCode           String             @default("SE")
+  regionCode            String?
+  anonymousAlias        String?
+  authorFingerprintHash String?
+  headline              String
+  body                  String
+  moderationDecision    ModerationDecision @default(PENDING)
+  publishedAt           DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  authority             Authority?         @relation(fields: [authorityId], references: [id], onDelete: SetNull)
+  official              Official?          @relation(fields: [officialId], references: [id], onDelete: SetNull)
+
+  @@index([officialId, moderationDecision, createdAt])
+  @@index([authorityId, moderationDecision, createdAt])
+}
+
+model LoopholeWikiPage {
+  id                String               @id @default(cuid())
+  slug              String               @unique
+  title             String
+  summary           String
+  category          String
+  tags              String[]
+  countryCode       String               @default("SE")
+  regionCode        String?
+  locale            String               @default("sv-SE")
+  status            WikiPageStatus       @default(DRAFT)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  revisions         LoopholeWikiRevision[]
+  discussions       LoopholeWikiDiscussion[]
+  votes             LoopholeWikiVote[]
+
+  @@index([countryCode, regionCode, category])
+  @@index([status, updatedAt])
+}
+
+model LoopholeWikiRevision {
+  id                 String             @id @default(cuid())
+  pageId             String
+  authorUserId       String?
+  anonymousAlias     String?
+  revisionNumber     Int
+  title              String
+  bodyMarkdown       String
+  changeSummary      String?
+  moderationDecision ModerationDecision @default(PENDING)
+  createdAt          DateTime           @default(now())
+  page               LoopholeWikiPage   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  authorUser         User?              @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  reviewItems        ReviewQueueItem[]
+
+  @@unique([pageId, revisionNumber])
+  @@index([moderationDecision, createdAt])
+}
+
+model LoopholeWikiDiscussion {
+  id                 String             @id @default(cuid())
+  pageId             String
+  anonymousAlias     String?
+  body               String
+  moderationDecision ModerationDecision @default(PENDING)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  page               LoopholeWikiPage   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, moderationDecision, createdAt])
+}
+
+model LoopholeWikiVote {
+  id                    String            @id @default(cuid())
+  pageId                String
+  userId                String?
+  voterFingerprintHash  String?
+  value                 Int
+  createdAt             DateTime          @default(now())
+  page                  LoopholeWikiPage  @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  user                  User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([pageId, createdAt])
+}
+
+model AutomatedAppealJob {
+  id                    String                 @id @default(cuid())
+  userId                String?
+  authorityId           String?
+  officialId            String?
+  massAppealBatchId     String?
+  countryCode           String                 @default("SE")
+  regionCode            String?
+  locale                String                 @default("sv-SE")
+  sourceTitle           String
+  sourceSummary         String
+  parsedDecisionSummary String?
+  aiRiskSummary         String?
+  status                AppealAutomationStatus @default(RECEIVED)
+  submissionMode        String                 @default("payg")
+  priceSek              Int                    @default(0)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  user                  User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  authority             Authority?             @relation(fields: [authorityId], references: [id], onDelete: SetNull)
+  official              Official?              @relation(fields: [officialId], references: [id], onDelete: SetNull)
+  massAppealBatch       MassAppealBatch?       @relation(fields: [massAppealBatchId], references: [id], onDelete: SetNull)
+  sourceAssets          EvidenceAsset[]
+  generatedArtifacts    AppealGeneratedArtifact[]
+
+  @@index([status, createdAt])
+  @@index([authorityId, createdAt])
+}
+
+model AppealGeneratedArtifact {
+  id                String             @id @default(cuid())
+  jobId             String
+  artifactKind      AppealArtifactKind
+  title             String
+  subjectLine       String
+  body              String
+  targetAuthorities String[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  job               AutomatedAppealJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, artifactKind])
+}

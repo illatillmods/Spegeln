@@ -1,0 +1,460 @@
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import os
+import re
+from statistics import mean, pstdev
+from typing import Any
+
+import httpx
+from fastapi import FastAPI, Header, HTTPException
+from pydantic import BaseModel, Field
+
+
+app = FastAPI(
+    title="Spegeln AI Worker",
+    version="0.1.0",
+    description="FastAPI-worker för tax optimization, dokumentklassning, entity extraction, embeddings, avvikelser och sammanfattningar.",
+)
+
+
+class TaxOptimizeRequest(BaseModel):
+    income: float = Field(ge=0)
+    assets: float = Field(ge=0)
+    notes: str = ""
+    locale: str = "sv-SE"
+    country_code: str = "SE"
+
+
+class TaxStrategy(BaseModel):
+    title: str
+    description: str
+    legal: bool = True
+    legalBasis: str
+    estimatedImpactSek: int
+    priority: str
+
+
+class TaxOptimizeResponse(BaseModel):
+    summary: str
+    strategies: list[TaxStrategy]
+    disclaimer: str
+    premium: bool = True
+
+
+class TextRequest(BaseModel):
+    text: str
+    locale: str = "sv-SE"
+    country_code: str = "SE"
+
+
+class NumericSeriesRequest(BaseModel):
+    values: list[float]
+    baseline_label: str = "dataset"
+
+
+class EvidenceManifest(BaseModel):
+    fileName: str
+    mimeType: str
+    byteSize: int = Field(ge=0)
+    assetKind: str
+    extractedText: str | None = None
+
+
+class FailureTriageRequest(BaseModel):
+    title: str
+    summary: str
+    locale: str = "sv-SE"
+    country_code: str = "SE"
+    evidence: list[EvidenceManifest] = []
+
+
+class FailureTriageResponse(BaseModel):
+    severity: str
+    priorityScore: int
+    summary: str
+    recommendedActions: list[str]
+
+
+class PressReleaseDraftRequest(BaseModel):
+    title: str
+    summary: str
+    severity: str
+    locale: str = "sv-SE"
+
+
+class PressReleaseDraftResponse(BaseModel):
+    headline: str
+    deck: str
+    bodyMarkdown: str
+
+
+class ReverseSurveillanceRequest(BaseModel):
+    title: str
+    summary: str
+    locale: str = "sv-SE"
+    evidence: list[EvidenceManifest] = []
+
+
+class ReverseSurveillanceResponse(BaseModel):
+    redactionPolicy: str
+    riskSummary: str
+    sharePack: dict[str, str]
+
+
+class AutomatedAppealBundleRequest(BaseModel):
+    source_title: str
+    source_summary: str
+    locale: str = "sv-SE"
+    country_code: str = "SE"
+
+
+class AutomatedAppealArtifact(BaseModel):
+    kind: str
+    title: str
+    subjectLine: str
+    body: str
+    suggestedAppealType: str
+
+
+class AutomatedAppealBundleResponse(BaseModel):
+    parsedDecisionSummary: str
+    riskSummary: str
+    artifacts: list[AutomatedAppealArtifact]
+
+
+async def require_worker_secret(x_worker_secret: str | None) -> None:
+    configured = os.getenv("AI_WORKER_SHARED_SECRET")
+    if configured and x_worker_secret != configured:
+        raise HTTPException(status_code=401, detail="Unauthorized worker request")
+
+
+async def maybe_call_model(system_prompt: str, user_payload: dict[str, Any]) -> dict[str, Any] | None:
+    api_url = os.getenv("AI_PROVIDER_API_URL")
+    api_key = os.getenv("AI_PROVIDER_API_KEY")
+    model = os.getenv("AI_CHAT_MODEL", "gpt-5-mini")
+    if not api_url or not api_key:
+        return None
+
+    async with httpx.AsyncClient(timeout=45.0) as client:
+        response = await client.post(
+            api_url.rstrip("/") + "/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": model,
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": json.dumps(user_payload, ensure_ascii=False)},
+                ],
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
+        content = payload["choices"][0]["message"]["content"]
+        return json.loads(content)
+
+
+def fallback_tax_strategies(payload: TaxOptimizeRequest) -> TaxOptimizeResponse:
+    strategies: list[TaxStrategy] = [
+        TaxStrategy(
+            title="ROT- och RUT-planering",
+            description="Samordna hushållsnära tjänster och godkända renoveringar mellan hushållsmedlemmar för att använda tillgängliga avdragsutrymmen utan dubblering eller felaktiga anspråk.",
+            legalBasis="Skatteverkets vägledningar om ROT och RUT samt inkomstskattelagens avdragsramar.",
+            estimatedImpactSek=6000,
+            priority="high" if payload.income > 450000 else "medium",
+        ),
+        TaxStrategy(
+            title="Kapitalplacering i rätt kontoform",
+            description="Jämför ISK, kapitalförsäkring och traditionell depå mot din omsättning, avkastning och likviditetsplan. Strategin är laglig men måste granskas mot verklig risk och tidshorisont.",
+            legalBasis="Svenska regler om schablonbeskattning och kapitalinkomstbeskattning.",
+            estimatedImpactSek=3500,
+            priority="medium",
+        ),
+    ]
+
+    if payload.income > 700000:
+        strategies.append(
+            TaxStrategy(
+                title="Tjänstepension och löneväxling",
+                description="Pröva om löneväxling eller förstärkt tjänstepensionsavsättning är ekonomiskt rimlig med hänsyn till brytpunkter, socialförsäkringsutfall och arbetsgivarens kostnadsbild.",
+                legalBasis="Svenska regler för tjänstepension, marginalskatt och pensionsavsättningar.",
+                estimatedImpactSek=9000,
+                priority="high",
+            )
+        )
+
+    if payload.assets > 1_000_000:
+        strategies.append(
+            TaxStrategy(
+                title="Årlig genomgång av kapitalstruktur",
+                description="Fördela sparande mellan kontoformer, räntor och värdepapper så att beskattningen följer investeringsmålen och inte skapar onödiga skatteeffekter.",
+                legalBasis="Regler om kapitalvinster, ränteintäkter och kontoformsspecifik beskattning.",
+                estimatedImpactSek=5000,
+                priority="medium",
+            )
+        )
+
+    return TaxOptimizeResponse(
+        summary="Legal-only analysen fokuserar på dokumenterade svenska regler och avstår från aggressiva eller dolda upplägg.",
+        strategies=strategies,
+        disclaimer="Endast lagliga och dokumenterade strategier. Ingen rådgivning om skatteflykt, osanna uppgifter eller dolda transaktioner.",
+    )
+
+
+def fallback_document_classification(text: str) -> dict[str, Any]:
+    lowered = text.lower()
+    labels = []
+    if any(keyword in lowered for keyword in ["jo-anmälan", "inspektionen", "anmälan"]):
+        labels.append("complaint")
+    if any(keyword in lowered for keyword in ["offentlighetsprincipen", "utlämnande", "allmän handling"]):
+        labels.append("foi_request")
+    if any(keyword in lowered for keyword in ["dom", "tingsrätt", "kammarrätt"]):
+        labels.append("court_document")
+    if not labels:
+        labels.append("general_public_sector_document")
+    return {"labels": labels, "confidence": 0.66}
+
+
+def fallback_entity_extraction(text: str) -> dict[str, Any]:
+    emails = re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)
+    dates = re.findall(r"\b\d{4}-\d{2}-\d{2}\b", text)
+    case_numbers = re.findall(r"\b[A-Z]\s?\d{2,6}-\d{2}\b", text)
+    organizations = re.findall(r"\b[A-ZÅÄÖ][A-Za-zÅÄÖåäö-]+(?:\s[A-ZÅÄÖ][A-Za-zÅÄÖåäö-]+){0,3}\b", text)
+    return {
+        "emails": sorted(set(emails)),
+        "dates": sorted(set(dates)),
+        "case_numbers": sorted(set(case_numbers)),
+        "organizations": sorted(set(organizations))[:20],
+    }
+
+
+def fallback_summary(text: str) -> dict[str, Any]:
+    sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+    summary = " ".join(sentences[:3]).strip()
+    return {"summary": summary[:600], "sentences_used": min(3, len(sentences))}
+
+
+def fallback_embedding(text: str) -> dict[str, Any]:
+    vector: list[float] = []
+    for index in range(32):
+        digest = hashlib.sha256(f"{index}:{text}".encode("utf-8")).digest()
+        value = int.from_bytes(digest[:4], "big") / 2**32
+        vector.append(round(value, 6))
+    return {"embedding": vector, "dimensions": len(vector)}
+
+
+def fallback_anomalies(values: list[float], baseline_label: str) -> dict[str, Any]:
+    if len(values) < 2:
+        return {"baseline_label": baseline_label, "anomalies": [], "mean": mean(values) if values else 0, "stddev": 0}
+
+    average = mean(values)
+    deviation = pstdev(values)
+    if deviation == 0:
+        return {"baseline_label": baseline_label, "anomalies": [], "mean": average, "stddev": deviation}
+
+    anomalies = []
+    for index, value in enumerate(values):
+        z_score = (value - average) / deviation
+        if math.fabs(z_score) >= 2.0:
+            anomalies.append({"index": index, "value": value, "z_score": round(z_score, 3)})
+
+    return {"baseline_label": baseline_label, "anomalies": anomalies, "mean": average, "stddev": deviation}
+
+
+def fallback_failure_triage(payload: FailureTriageRequest) -> FailureTriageResponse:
+    evidence_weight = min(20, len(payload.evidence) * 4)
+    severity = "CRITICAL" if "våld" in payload.summary.lower() or "övergrepp" in payload.summary.lower() else "HIGH"
+    return FailureTriageResponse(
+        severity=severity,
+        priorityScore=min(95, 62 + evidence_weight),
+        summary="Underlaget tyder på ett granskningsvärt myndighetsärende som bör verifieras, prioriteras och skickas vidare till moderation samt juridisk genomgång.",
+        recommendedActions=[
+            "Verifiera diarienummer, datum och om det finns parallella beslut.",
+            "Säkerställ att känsliga personuppgifter maskas före extern publicering.",
+            "Låt jurist bedöma publiceringsrisk innan pressutskick eller namnpublicering.",
+        ],
+    )
+
+
+def fallback_press_release(payload: PressReleaseDraftRequest) -> PressReleaseDraftResponse:
+    return PressReleaseDraftResponse(
+        headline=payload.title,
+        deck="Internt pressutkast för verifierat watchdog-ärende. Får inte publiceras utan moderation och juridisk granskning.",
+        bodyMarkdown=(
+            f"## Ärendet\n\n{payload.summary}\n\n"
+            "## Vad som händer nu\n\n"
+            "Materialet granskas nu av moderator och jurist. Först därefter kan eventuell publicering, rättelseförfrågan eller presskontakt bli aktuell."
+        ),
+    )
+
+
+def fallback_reverse_surveillance(payload: ReverseSurveillanceRequest) -> ReverseSurveillanceResponse:
+    return ReverseSurveillanceResponse(
+        redactionPolicy="Bystanders and sensitive persons are blurred by default. Any decision to reveal identifiable public officials requires manual legal review.",
+        riskSummary="Videon måste verifieras, tidsstämplas och granskas för tredjemansrisk innan delning eller publicering.",
+        sharePack={
+            "pressHeadline": payload.title,
+            "socialCaption": "Nytt videomaterial inkommet. Identitetsskydd och juridisk kontroll går före distribution.",
+            "alertText": "Ny video i granskningskön. Redaktions- och juristkontroll krävs.",
+        },
+    )
+
+
+def fallback_appeal_bundle(payload: AutomatedAppealBundleRequest) -> AutomatedAppealBundleResponse:
+    return AutomatedAppealBundleResponse(
+        parsedDecisionSummary=payload.source_summary,
+        riskSummary="Beslutet verkar överklagbart eller kräver kompletterande dokument. Utkasten måste granskas innan inskick.",
+        artifacts=[
+            AutomatedAppealArtifact(
+                kind="APPEAL",
+                title=f"Överklagande av {payload.source_title}",
+                subjectLine=f"Överklagande: {payload.source_title}",
+                body=(
+                    f"Jag överklagar beslutet {payload.source_title}.\n\n"
+                    f"Bakgrund:\n{payload.source_summary}\n\n"
+                    "Jag begär att beslutet omprövas och att fullständig motivering samt underlag lämnas ut."
+                ),
+                suggestedAppealType="klagomal",
+            ),
+            AutomatedAppealArtifact(
+                kind="DOCUMENT_REQUEST",
+                title=f"Handlingbegäran för {payload.source_title}",
+                subjectLine=f"Begäran om allmän handling: {payload.source_title}",
+                body=(
+                    "Jag begär att få ta del av samtliga handlingar, bilagor, interna anteckningar och diarienoteringar som ligger till grund för beslutet."
+                ),
+                suggestedAppealType="info",
+            ),
+        ],
+    )
+
+
+@app.get("/healthz")
+async def healthz() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.post("/v1/tax/optimize", response_model=TaxOptimizeResponse)
+async def optimize_tax(payload: TaxOptimizeRequest, x_worker_secret: str | None = Header(default=None)) -> TaxOptimizeResponse:
+    await require_worker_secret(x_worker_secret)
+
+    model_result = await maybe_call_model(
+        system_prompt=(
+            "You are a Swedish tax optimization assistant. Only return legal, documented, conservative strategies. "
+            "Never provide advice for fraud, concealment, false deductions, offshore hiding, sham transactions, or other illegal tax evasion. "
+            "Respond as JSON with summary, strategies, disclaimer, premium."
+        ),
+        user_payload=payload.model_dump(),
+    )
+    if model_result:
+        return TaxOptimizeResponse(**model_result)
+
+    return fallback_tax_strategies(payload)
+
+
+@app.post("/v1/nlp/classify-document")
+async def classify_document(payload: TextRequest, x_worker_secret: str | None = Header(default=None)) -> dict[str, Any]:
+    await require_worker_secret(x_worker_secret)
+    model_result = await maybe_call_model(
+        system_prompt="Classify the public-sector document into a few concise labels. Return JSON with labels and confidence.",
+        user_payload=payload.model_dump(),
+    )
+    return model_result or fallback_document_classification(payload.text)
+
+
+@app.post("/v1/nlp/extract-entities")
+async def extract_entities(payload: TextRequest, x_worker_secret: str | None = Header(default=None)) -> dict[str, Any]:
+    await require_worker_secret(x_worker_secret)
+    model_result = await maybe_call_model(
+        system_prompt="Extract public-sector relevant entities from the text. Return JSON with organizations, dates, case_numbers and emails.",
+        user_payload=payload.model_dump(),
+    )
+    return model_result or fallback_entity_extraction(payload.text)
+
+
+@app.post("/v1/nlp/summarize")
+async def summarize(payload: TextRequest, x_worker_secret: str | None = Header(default=None)) -> dict[str, Any]:
+    await require_worker_secret(x_worker_secret)
+    model_result = await maybe_call_model(
+        system_prompt="Summarize the text for an investigative editor. Return JSON with summary and key points.",
+        user_payload=payload.model_dump(),
+    )
+    return model_result or fallback_summary(payload.text)
+
+
+@app.post("/v1/nlp/embed")
+async def embed(payload: TextRequest, x_worker_secret: str | None = Header(default=None)) -> dict[str, Any]:
+    await require_worker_secret(x_worker_secret)
+    return fallback_embedding(payload.text)
+
+
+@app.post("/v1/nlp/detect-anomalies")
+async def detect_anomalies(payload: NumericSeriesRequest, x_worker_secret: str | None = Header(default=None)) -> dict[str, Any]:
+    await require_worker_secret(x_worker_secret)
+    return fallback_anomalies(payload.values, payload.baseline_label)
+
+
+@app.post("/v1/watchdog/triage-case", response_model=FailureTriageResponse)
+async def triage_case(payload: FailureTriageRequest, x_worker_secret: str | None = Header(default=None)) -> FailureTriageResponse:
+    await require_worker_secret(x_worker_secret)
+    model_result = await maybe_call_model(
+        system_prompt=(
+            "You triage public watchdog case reports. Assess severity conservatively, prioritize verification, moderation and legal review. "
+            "Never encourage harassment, doxxing, or publication of unverified accusations. Return JSON with severity, priorityScore, summary, recommendedActions."
+        ),
+        user_payload=payload.model_dump(),
+    )
+    if model_result:
+        return FailureTriageResponse(**model_result)
+    return fallback_failure_triage(payload)
+
+
+@app.post("/v1/watchdog/generate-press-release", response_model=PressReleaseDraftResponse)
+async def generate_press_release(payload: PressReleaseDraftRequest, x_worker_secret: str | None = Header(default=None)) -> PressReleaseDraftResponse:
+    await require_worker_secret(x_worker_secret)
+    model_result = await maybe_call_model(
+        system_prompt=(
+            "Draft a careful press release for an investigative newsroom. The text must emphasize verification status, moderation, and legal review. "
+            "Do not make unsupported accusations. Return JSON with headline, deck, bodyMarkdown."
+        ),
+        user_payload=payload.model_dump(),
+    )
+    if model_result:
+        return PressReleaseDraftResponse(**model_result)
+    return fallback_press_release(payload)
+
+
+@app.post("/v1/watchdog/reverse-surveillance", response_model=ReverseSurveillanceResponse)
+async def reverse_surveillance(payload: ReverseSurveillanceRequest, x_worker_secret: str | None = Header(default=None)) -> ReverseSurveillanceResponse:
+    await require_worker_secret(x_worker_secret)
+    model_result = await maybe_call_model(
+        system_prompt=(
+            "Design a safe handling plan for uploaded intervention video. Prioritize blurring bystanders and sensitive persons, protecting third parties, "
+            "and requiring legal review before public release of identifiable persons. Return JSON with redactionPolicy, riskSummary, sharePack."
+        ),
+        user_payload=payload.model_dump(),
+    )
+    if model_result:
+        return ReverseSurveillanceResponse(**model_result)
+    return fallback_reverse_surveillance(payload)
+
+
+@app.post("/v1/appeals/generate-bundle", response_model=AutomatedAppealBundleResponse)
+async def generate_appeal_bundle(payload: AutomatedAppealBundleRequest, x_worker_secret: str | None = Header(default=None)) -> AutomatedAppealBundleResponse:
+    await require_worker_secret(x_worker_secret)
+    model_result = await maybe_call_model(
+        system_prompt=(
+            "Generate a Swedish administrative appeal bundle from an authority decision. Provide lawful, factual draft texts only. "
+            "Return JSON with parsedDecisionSummary, riskSummary, artifacts where artifacts can be APPEAL, COMPLAINT, or DOCUMENT_REQUEST."
+        ),
+        user_payload=payload.model_dump(),
+    )
+    if model_result:
+        return AutomatedAppealBundleResponse(**model_result)
+    return fallback_appeal_bundle(payload)

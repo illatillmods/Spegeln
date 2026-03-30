@@ -23,6 +23,7 @@ Den här repot är nu justerad för en hosted-first driftmodell där Vercel är 
 ## Det som är implementerat i den här repot
 
 - Svensk, responsiv Next.js-app med sidor för startsida, plattform, juridik och prissättning.
+- Ny liveorienterad startsida med auto-uppdaterad feed för granskningsärenden och videointag, plus sidomoduler för omdebatterade aktörer, loopholes och mass action.
 - Modern layout med App Router, Tailwind CSS v4 och TypeScript.
 - Prisma-schema för användare, bevakningar, rapporter, juridisk granskning, tips, usage-prissättning och audit-loggar.
 - Prisma-persistens för Byråkrati-bombaren med batcher, dokument, leveransstatus och koppling till usage records.
@@ -45,6 +46,7 @@ Den här repot är nu justerad för en hosted-first driftmodell där Vercel är 
 - `Statens svagheter` för versionsstyrd wiki med kategorier, taggar och kvalitetsröstning.
 - `Reverse Surveillance` för skyddad videointag, redaktionskö, maskningspolicy och kontrollerade delningspaket.
 - `Automatiserad överklagare` inbyggd i Byråkrati-bombaren för AI-genererade överklagandebuntar och valfri automatisk submission.
+- `Övervakningsspegeln` läser nu den riktiga Prisma-datamodellen för myndigheter, profiler, alerts, rapporter och klagomål när databasen är konfigurerad, med fallbackdata endast för db-lös utveckling.
 
 ## Monetisering
 
@@ -83,6 +85,15 @@ Prioriterade kontrollpunkter:
 5. Om du vill köra workers eller fallback-webb på Railway finns `railway.json` redan på plats.
 6. Kontrollera `/api/health` efter första deploy för att bekräfta URL-detektering och databasstatus.
 7. Lägg in `AUTH_SESSION_SECRET`, eventuella OAuth-nycklar och Stripe price IDs innan du aktiverar auth eller betalda planer.
+
+### Rekommenderad releaseordning för Vercel + Railway
+
+1. Skapa PostgreSQL i Railway och sätt samma `DATABASE_URL` i både Railway och Vercel.
+2. Lägg webbhemligheter i Vercel: `AUTH_SESSION_SECRET`, `NEXT_PUBLIC_APP_URL`, Stripe-nycklar, OAuth-uppgifter och eventuellt `AI_WORKER_URL`.
+3. Lägg worker- eller transporthemligheter i Railway: `AI_WORKER_SHARED_SECRET`, `AI_PROVIDER_*`, `MASS_APPEALS_SMTP_*` och eventuell secure mailbox-webhook.
+4. Kör `npm run db:push` mot produktionsdatabasen innan första publika deploy om schemat ännu inte finns.
+5. Verifiera `GET /api/health` efter deploy. Endpointen visar nu separat status för databas, auth, payments, AI-worker och social auth.
+6. Gå igenom `/overvakningsspegeln`, `/insynsindex`, `/myndighetsgranskaren` och `/reverse-surveillance` i produktion för att bekräfta att liveflödena läser riktig data i stället för fallback.
 
 ## Minimal lokal fallback
 
