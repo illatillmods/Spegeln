@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { heroMetrics, stackChoices, workflowSteps } from "@/lib/site-content";
+import { protestModules } from "@/lib/module-manifest";
 
 const toneClasses = {
   teal: "tone-teal",
@@ -46,7 +47,7 @@ const pathways = [
     tone: "ink" as const,
     links: [
       { href: "/myndighetsgranskaren", label: "Myndighetsgranskaren" },
-      { href: "/reverse-surveillance", label: "Reverse Surveillance" },
+      { href: "/reverse-surveillance", label: "Motbevakning" },
       { href: "/folkets-domstol", label: "Folkets domstol" },
     ],
   },
@@ -96,10 +97,10 @@ export function StartHub() {
         <div className="space-y-5 reveal">
           <p className="eyebrow">Start här</p>
           <h1 className="max-w-4xl font-title text-5xl leading-none sm:text-6xl">
-            En samlad front mot myndighetsspråk, mörkläggning och byråkratisk tröghet.
+            Åtta verktyg. Ett långfinger mot makten.
           </h1>
           <p className="max-w-3xl text-(--muted) text-lg leading-8">
-            Välj hur du vill sätta trycket: gräv, slå tillbaka, bidra eller jämför. Den här sidan samlar de viktigaste vägarna in i plattformen utan att be om ursäkt för varför den finns.
+            Övervaka makthavare, bomba byråkratin, publicera misslyckanden, döm dem i folkets domstol, sprid motbilder och låt AI överklaga allt — lagligt, hårt och utan ursäkt.
           </p>
           <div className="flex flex-wrap gap-3">
             <Link className="btn-primary" href="/overvakningsspegeln">
@@ -189,7 +190,21 @@ export function StartHub() {
 
       <section className="space-y-5 reveal">
         <div className="max-w-3xl">
-          <p className="eyebrow">Snabbvägar</p>
+          <p className="eyebrow">Alla åtta verktyg</p>
+          <h2 className="mt-2 font-title text-4xl">Manifestet i praktiken — ett långfinger per modul.</h2>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {protestModules.map((module, index) => (
+            <Link className="surface rounded-[1.9rem] p-6 transition hover:-translate-y-0.5 reveal" href={module.slug} key={module.id} style={{ animationDelay: `${index * 60}ms` }}>
+              <p className="eyebrow">{module.shortTitle}</p>
+              <h3 className="mt-2 font-title text-2xl">{module.tagline}</h3>
+              <p className="mt-3 text-(--muted) text-sm leading-7">{module.extremLangfinger.slice(0, 120)}…</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-5 reveal">
           <h2 className="mt-2 font-title text-4xl">Sidor som förklarar drivkraft, finansiering och hur du styr dina egna spår.</h2>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">

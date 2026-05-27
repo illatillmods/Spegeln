@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { EvidenceAssetKind, IntakeLifecycleStatus, type Prisma } from "@prisma/client";
 import { requestReverseSurveillancePlan, type EvidenceManifest } from "@/lib/ai-worker";
+import { resolveEvidenceAccessUrl } from "@/lib/object-storage";
 import { getPrismaClient } from "@/lib/prisma";
 
 export type ReverseSurveillanceInput = {
@@ -28,7 +29,14 @@ export type ReverseSurveillanceView = {
   socialCaption: string;
   lifecycleStatus: string;
   createdAt: string;
-  evidenceAssets?: Array<{ id: string; fileName: string; mimeType: string; storageKey: string }>;
+  redactionPlan?: Array<{ label: string; timestamp?: string }>;
+  evidenceAssets?: Array<{
+    id: string;
+    fileName: string;
+    mimeType: string;
+    storageKey: string;
+    playbackUrl?: string | null;
+  }>;
 };
 
 type ActorContext = {
@@ -55,6 +63,41 @@ function resolveStorageKey(asset: EvidenceManifest, index: number) {
   }
 
   return `pending://reverse/${Date.now()}-${index}-${asset.fileName}`;
+}
+
+function parseRedactionPlan(sharePack: Prisma.JsonValue) {
+  const payload = sharePack as Prisma.JsonObject | null;
+  const markers = payload?.redactionMarkers;
+
+  if (!Array.isArray(markers)) {
+    return undefined;
+  }
+
+  return markers
+    .filter((entry): entry is { label: string; timestamp?: string } => typeof entry === "object" && entry !== null && "label" in entry)
+    .map((entry) => ({
+      label: String(entry.label),
+      timestamp: typeof entry.timestamp === "string" ? entry.timestamp : undefined,
+    }));
+}
+
+async function mapEvidenceAssets(
+  assets: Array<{ id: string; fileName: string; mimeType: string; storageKey: string }>,
+) {
+  return Promise.all(
+    assets.map(async (asset) => {
+      const signedUrl = await resolveEvidenceAccessUrl(asset.storageKey);
+      const playbackUrl =
+        asset.mimeType.startsWith("video/") || asset.mimeType.startsWith("audio/")
+          ? signedUrl || (asset.storageKey.startsWith("file://") ? `/api/evidence/${asset.id}/stream` : null)
+          : null;
+
+      return {
+        ...asset,
+        playbackUrl,
+      };
+    }),
+  );
 }
 
 function mapReverseRecord(record: {
@@ -84,6 +127,7 @@ function mapReverseRecord(record: {
     socialCaption: typeof sharePack?.socialCaption === "string" ? sharePack.socialCaption : "Nytt material i verifieringskön.",
     lifecycleStatus: record.lifecycleStatus,
     createdAt: record.createdAt.toISOString(),
+    redactionPlan: parseRedactionPlan(record.sharePack),
   };
 }
 
@@ -118,14 +162,11 @@ export async function getReverseSurveillanceById(id: string): Promise<ReverseSur
 
   if (!record) return null;
 
+  const base = mapReverseRecord(record);
+
   return {
-    ...mapReverseRecord(record),
-    evidenceAssets: record.evidenceAssets.map((asset) => ({
-      id: asset.id,
-      fileName: asset.fileName,
-      mimeType: asset.mimeType,
-      storageKey: asset.storageKey,
-    })),
+    ...base,
+    evidenceAssets: await mapEvidenceAssets(record.evidenceAssets),
   };
 }
 
@@ -166,6 +207,7 @@ export async function createReverseSurveillanceSubmission(
         socialCaption: plan.sharePack.socialCaption,
         pressHeadline: plan.sharePack.pressHeadline,
         alertText: plan.sharePack.alertText,
+        redactionMarkers: plan.sharePack.redactionMarkers || [],
       },
       evidenceAssets: {
         create: input.evidence.map((asset, index) => ({

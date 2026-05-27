@@ -20,6 +20,7 @@ import {
   getReverseSurveillanceById,
   getTaxAnalysisById,
   getWikiPageBySlug,
+  listAccountNotifications,
   listAutomatedAppealJobs,
   listAuthorityFailureReports,
   listReverseSurveillance,
@@ -27,10 +28,15 @@ import {
   listWikiPages,
   submitConfidenceTestimonial,
   submitConfidenceVote,
+  submitWikiVote,
+  listWikiCategories,
   upsertUserWatch,
 } from "../../src/lib/civic-features";
 import { listTaxAnalyses } from "../../src/lib/civic/tax-analyses";
-import { storeEvidenceFile } from "../../src/lib/object-storage";
+import { storeEvidenceFile, resolveEvidenceAccessUrl } from "../../src/lib/object-storage";
+import { extractDocumentText } from "../../src/lib/document-intake";
+import { listPressFeed } from "../../src/lib/press-feed";
+import { runConfiguredWatchdogIngestion } from "../../src/lib/watchdog-ingestion";
 import { recordAuditEvent, reportServerError } from "../../src/lib/observability";
 import { mergePaymentRequestMetadata, markPaymentRequestPaid, setPaymentRequestStatus } from "../../src/lib/payment-requests";
 import {
@@ -700,6 +706,23 @@ app.post("/api/admin/watchdog/import", async (c) => {
   return c.json(result);
 });
 
+app.post("/api/admin/watchdog/ingest-cron", async (c) => {
+  const cronSecret = process.env.CRON_SECRET;
+  const provided = c.req.header("x-cron-secret");
+
+  if (!cronSecret || provided !== cronSecret) {
+    return c.json({ error: "Behörighet saknas." }, 403);
+  }
+
+  try {
+    const result = await runConfiguredWatchdogIngestion();
+    return c.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Ingestion misslyckades.";
+    return c.json({ error: message }, 500);
+  }
+});
+
 app.get("/api/insights/leaderboard", async (c) => {
   const { searchParams } = new URL(c.req.url);
   const items = await getLeaderboard(searchParams.get("window") || undefined, searchParams.get("country") || "SE");
@@ -879,6 +902,32 @@ app.post("/api/statens-svagheter/pages", async (c) => {
   }
 });
 
+app.post("/api/statens-svagheter/vote", async (c) => {
+  try {
+    const payload = await c.req.json();
+    const user = await getSessionUser(c);
+    const value = payload?.value === -1 ? -1 : 1;
+    const pageId = typeof payload?.pageId === "string" ? payload.pageId : "";
+
+    if (!pageId) {
+      return c.json({ error: "pageId krävs." }, 400);
+    }
+
+    const result = await submitWikiVote({
+      pageId,
+      value,
+      userId: user?.id,
+      fingerprintSource: getFingerprintSource(c.req.raw),
+    });
+    return c.json(result, 201);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Kunde inte registrera rösten.";
+    return c.json({ error: message }, 400);
+  }
+});
+
+app.get("/api/statens-svagheter/categories", async (c) => c.json(await listWikiCategories()));
+
 app.get("/api/reverse-surveillance/submissions", async (c) => c.json({ items: await listReverseSurveillance() }));
 
 app.get("/api/reverse-surveillance/submissions/:id", async (c) => {
@@ -900,12 +949,86 @@ app.post("/api/uploads/evidence", async (c) => {
     }
 
     const buffer = Buffer.from(await file.arrayBuffer());
-    const stored = await storeEvidenceFile(file.name, buffer, file.type || "application/octet-stream");
-    return c.json(stored, 201);
+    const mimeType = file.type || "application/octet-stream";
+    const stored = await storeEvidenceFile(file.name, buffer, mimeType);
+    const extractedText = (await extractDocumentText(buffer, mimeType, file.name)).slice(0, 5000) || undefined;
+    return c.json({ ...stored, extractedText }, 201);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Uppladdning misslyckades.";
     return c.json({ error: message }, 400);
   }
+});
+
+app.post("/api/uploads/extract-text", async (c) => {
+  try {
+    const body = await c.req.parseBody();
+    const file = body.file;
+
+    if (!file || typeof file === "string") {
+      return c.json({ error: "Fil saknas." }, 400);
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const mimeType = file.type || "application/octet-stream";
+    const text = await extractDocumentText(buffer, mimeType, file.name);
+
+    if (!text) {
+      return c.json({ error: "Kunde inte extrahera text från filen." }, 422);
+    }
+
+    return c.json({ text: text.slice(0, 12000) });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Textextraktion misslyckades.";
+    return c.json({ error: message }, 400);
+  }
+});
+
+app.get("/api/evidence/:assetId/stream", async (c) => {
+  const prisma = getPrismaClient();
+  if (!prisma) {
+    return c.json({ error: "Databas saknas." }, 503);
+  }
+
+  const asset = await prisma.evidenceAsset.findUnique({
+    where: { id: c.req.param("assetId") },
+  });
+
+  if (!asset || !asset.storageKey.startsWith("file://")) {
+    return c.json({ error: "Filen hittades inte." }, 404);
+  }
+
+  const { readFile } = await import("node:fs/promises");
+  const buffer = await readFile(asset.storageKey.slice("file://".length));
+  return new Response(buffer, {
+    headers: {
+      "Content-Type": asset.mimeType,
+      "Cache-Control": "private, max-age=300",
+    },
+  });
+});
+
+app.get("/api/evidence/:assetId/access", async (c) => {
+  const prisma = getPrismaClient();
+  if (!prisma) {
+    return c.json({ error: "Databas saknas." }, 503);
+  }
+
+  const asset = await prisma.evidenceAsset.findUnique({
+    where: { id: c.req.param("assetId") },
+  });
+
+  if (!asset) {
+    return c.json({ error: "Filen hittades inte." }, 404);
+  }
+
+  const signedUrl = await resolveEvidenceAccessUrl(asset.storageKey);
+  const url = signedUrl || (asset.storageKey.startsWith("file://") ? `/api/evidence/${asset.id}/stream` : null);
+
+  if (!url) {
+    return c.json({ error: "Uppspelnings-URL saknas." }, 404);
+  }
+
+  return c.json({ url, mimeType: asset.mimeType, fileName: asset.fileName });
 });
 
 app.post("/api/reverse-surveillance/submissions", async (c) => {
@@ -1001,6 +1124,15 @@ app.get("/api/konto/overview", async (c) => {
   }
 
   return c.json(await getAccountOverview(user.id));
+});
+
+app.get("/api/konto/notifications", async (c) => {
+  const user = await getSessionUser(c);
+  if (!user) {
+    return c.json({ error: "Inloggning krävs." }, 401);
+  }
+
+  return c.json({ items: await listAccountNotifications(user.id) });
 });
 
 app.get("/api/konto/tax-analyses", async (c) => {
@@ -1366,6 +1498,11 @@ app.patch("/api/admin/payments/:id", async (c) => {
     await reportServerError(error, { route: "admin.payments.update" });
     return c.json({ error: error instanceof Error ? error.message : "Kunde inte uppdatera betalningsärendet." }, 400);
   }
+});
+
+app.get("/api/public/press-feed", async (c) => {
+  const items = await listPressFeed(30);
+  return c.json({ items, updatedAt: new Date().toISOString() });
 });
 
 app.get("/api/public/access-tiers", (c) => c.json({

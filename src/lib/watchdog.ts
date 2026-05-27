@@ -150,6 +150,12 @@ export type WatchTrustSnapshot = {
   testimonials: number;
 };
 
+export type WatchCourtTestimonial = {
+  headline: string;
+  body: string;
+  createdAt: string;
+};
+
 export type WatchProfile = {
   id: string;
   fullName: string;
@@ -177,6 +183,7 @@ export type WatchProfile = {
   recordDigests: WatchRecordDigest[];
   verdicts: WatchVerdict[];
   trust: WatchTrustSnapshot;
+  courtTestimonials: WatchCourtTestimonial[];
   watchTarget: WatchTargetSummary;
 };
 
@@ -849,6 +856,11 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
     recordDigests,
     verdicts: [],
     trust,
+    courtTestimonials: official.testimonials.map((item) => ({
+      headline: item.headline,
+      body: item.body,
+      createdAt: item.createdAt.toISOString(),
+    })),
     watchTarget: buildOfficialWatchTarget(official.id, official.fullName),
   };
 }

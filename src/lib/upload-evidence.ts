@@ -17,6 +17,7 @@ export async function uploadEvidenceFiles(files: FileList | null): Promise<Evide
       fileName?: string;
       mimeType?: string;
       byteSize?: number;
+      extractedText?: string;
       error?: string;
     };
 
@@ -36,6 +37,7 @@ export async function uploadEvidenceFiles(files: FileList | null): Promise<Evide
             ? "TEXT"
             : "DOCUMENT",
       storageKey: data.storageKey,
+      extractedText: data.extractedText,
     });
   }
 
@@ -52,7 +54,18 @@ export async function readTextFromFiles(files: FileList | null) {
     }
 
     if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
-      chunks.push(`[PDF: ${file.name} — text extraheras i produktion via OCR.]`);
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/uploads/extract-text", {
+        method: "POST",
+        body: formData,
+      });
+      const data = (await response.json()) as { text?: string; error?: string };
+      if (response.ok && data.text) {
+        chunks.push(data.text);
+      } else {
+        chunks.push(`[PDF: ${file.name} — kunde inte extrahera text.]`);
+      }
     }
   }
 

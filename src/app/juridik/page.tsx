@@ -5,6 +5,7 @@ import {
   launchChecklist,
   legalPillars,
 } from "@/lib/site-content";
+import { protestModules } from "@/lib/module-manifest";
 
 const toneClasses = {
   teal: "tone-teal",
@@ -46,6 +47,21 @@ export default function LegalPage() {
             ))}
           </ul>
         </aside>
+      </section>
+
+      <section className="space-y-4">
+        <p className="eyebrow reveal">Åtta frontlinjer</p>
+        <h2 className="font-title text-4xl reveal">Verktygen som vänder kameran mot makten.</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          {protestModules.map((module, index) => (
+            <article className="surface rounded-[1.9rem] p-6 reveal" key={module.id} style={{ animationDelay: `${index * 80}ms` }}>
+              <p className="eyebrow">{module.shortTitle}</p>
+              <h3 className="mt-2 font-title text-3xl">{module.title}</h3>
+              <p className="mt-3 text-(--muted) text-sm leading-7">{module.extremLangfinger}</p>
+              <p className="mt-3 text-(--muted) text-xs leading-6">{module.lagligt}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="grid gap-4 md:grid-cols-2">

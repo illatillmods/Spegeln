@@ -80,8 +80,14 @@ export function AuthorityFailuresClient({ initialItems }: Props) {
       <form className="surface rounded-4xl p-6 md:p-8 space-y-4" onSubmit={handleSubmit}>
         <div>
           <p className="eyebrow">Anonymt uppladdningsflöde</p>
-          <h2 className="mt-2 font-title text-4xl">Rapportera fel, maktmissbruk och skandaler.</h2>
+          <h2 className="mt-2 font-title text-4xl">Exponera makthavare. Publicera automatiskt.</h2>
         </div>
+        <p className="text-(--muted) text-sm leading-7">
+          Graverande rapporter publiceras automatiskt efter AI-triage. Pressfeed för journalister:{" "}
+          <a className="underline" href="/api/public/press-feed" rel="noreferrer" target="_blank">
+            /api/public/press-feed
+          </a>
+        </p>
         <input className="input" placeholder="Kort titel" required value={title} onChange={(event) => setTitle(event.target.value)} />
         <textarea className="input min-h-40" placeholder="Beskriv händelsen." required value={summary} onChange={(event) => setSummary(event.target.value)} />
         <input className="input" placeholder="Valfritt alias" value={alias} onChange={(event) => setAlias(event.target.value)} />
@@ -103,6 +109,7 @@ export function AuthorityFailuresClient({ initialItems }: Props) {
                   <p className="eyebrow">{item.anonymousAlias || "Anonym källa"}</p>
                   <h3 className="mt-2 text-2xl font-semibold">{item.title}</h3>
                 </div>
+                <span className="tag">{item.lifecycleStatus}</span>
                 <span className="tag">{item.aiSeverity}</span>
               </div>
               <p className="mt-3 text-(--muted) text-sm leading-7">{item.summary}</p>

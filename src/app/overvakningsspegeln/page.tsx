@@ -1,10 +1,13 @@
 import Link from "next/link";
+import { getProtestModule } from "@/lib/module-manifest";
 import type { WatchAuthorityCard, WatchdogSnapshot } from "@/lib/watchdog";
 import { serverApiJson } from "@/lib/server-api";
 
+const mod = getProtestModule("overvakningsspegeln")!;
+
 export const metadata = {
-  title: "Övervakningsspegeln",
-  description: "Offentliga poster, källspårning, relationsgrafer och öppna granskningsprofiler för maktens beslutsflöden.",
+  title: mod.shortTitle,
+  description: mod.description,
 };
 
 export default async function OvervakningsspegelnPage() {
@@ -42,12 +45,10 @@ export default async function OvervakningsspegelnPage() {
     <div className="shell space-y-16 pb-20 pt-10 md:pt-14">
       <section className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
         <div className="space-y-5 reveal">
-          <p className="eyebrow">Utforska</p>
-          <h1 className="max-w-4xl font-title text-5xl leading-none sm:text-6xl">
-            Gå från öppet spår till profil, myndighet och mönster utan att byta grepp.
-          </h1>
+          <p className="eyebrow">{mod.eyebrow}</p>
+          <h1 className="max-w-4xl font-title text-5xl leading-none sm:text-6xl">{mod.title}</h1>
           <p className="max-w-3xl text-(--muted) text-lg leading-8">
-            Övervakningsspegeln är platsen där du följer vem som bär makt, vilka dokument som hakar i varandra och hur myndigheternas spår byggs upp över tid.
+            {mod.description} {mod.extremLangfinger}
           </p>
           <div className="flex flex-wrap gap-3">
             <Link className="btn-primary" href="/overvakningsspegeln/sok">

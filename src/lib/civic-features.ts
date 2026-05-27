@@ -1,5 +1,5 @@
-export { getWikiPageBySlug } from "@/lib/civic/wiki";
-export { getAccountOverview, deleteUserWatch, listUserWatches, upsertUserWatch } from "@/lib/civic/account";
+export { getAccountOverview, deleteUserWatch, listUserWatches, upsertUserWatch, listAccountNotifications, type AccountNotification } from "@/lib/civic/account";
+export { getWikiPageBySlug, submitWikiVote, listWikiCategories } from "@/lib/civic/wiki";
 export { getTaxAnalysisById, listTaxAnalyses, saveTaxAnalysis } from "@/lib/civic/tax-analyses";
 export {
   createReverseSurveillanceSubmission,
@@ -191,6 +191,15 @@ function severityFromAi(value: string) {
   return SeverityLevel[value as keyof typeof SeverityLevel] || SeverityLevel.MEDIUM;
 }
 
+function shouldAutoPublishReport(priorityScore: number, severity: string) {
+  if (process.env.AUTO_PUBLISH_REPORTS === "false") {
+    return false;
+  }
+
+  const threshold = Number(process.env.AUTO_PUBLISH_THRESHOLD || 70);
+  return priorityScore >= threshold && (severity === "HIGH" || severity === "CRITICAL");
+}
+
 function mapFailureReport(record: {
   id: string;
   title: string;
@@ -293,6 +302,7 @@ export async function createAuthorityFailureReport(input: FailureReportInput, ac
     severity: triage.severity,
     locale: "sv-SE",
   });
+  const autoPublish = shouldAutoPublishReport(triage.priorityScore, triage.severity);
 
   const record = await prisma.authorityFailureReport.create({
     data: {
@@ -306,13 +316,14 @@ export async function createAuthorityFailureReport(input: FailureReportInput, ac
       title,
       summary,
       incidentDate: input.incidentDate ? new Date(input.incidentDate) : null,
-      lifecycleStatus: IntakeLifecycleStatus.AI_TRIAGED,
+      lifecycleStatus: autoPublish ? IntakeLifecycleStatus.PUBLISHED : IntakeLifecycleStatus.AI_TRIAGED,
       aiSeverity: severityFromAi(triage.severity),
       aiPriorityScore: triage.priorityScore,
       aiSummary: triage.summary,
       pressReleaseDraft: pressRelease.bodyMarkdown,
-      moderationDecision: ModerationDecision.PENDING,
-      legalReviewDecision: ModerationDecision.PENDING,
+      moderationDecision: autoPublish ? ModerationDecision.APPROVED : ModerationDecision.PENDING,
+      legalReviewDecision: autoPublish ? ModerationDecision.APPROVED : ModerationDecision.PENDING,
+      publishedAt: autoPublish ? new Date() : null,
       evidenceAssets: {
         create: input.evidence.map((asset, index) => ({
           assetKind: toAssetKind(asset.assetKind),
@@ -326,7 +337,9 @@ export async function createAuthorityFailureReport(input: FailureReportInput, ac
       reviewItems: {
         create: {
           targetType: "authority_failure_report",
-          status: IntakeLifecycleStatus.MODERATION,
+          status: autoPublish ? IntakeLifecycleStatus.PUBLISHED : IntakeLifecycleStatus.MODERATION,
+          moderationDecision: autoPublish ? ModerationDecision.APPROVED : ModerationDecision.PENDING,
+          legalDecision: autoPublish ? ModerationDecision.APPROVED : ModerationDecision.PENDING,
         },
       },
     },
@@ -614,9 +627,17 @@ export async function createAutomatedAppealJob(input: AutomatedAppealInput, acto
     throw new Error("DATABASE_URL saknas. Automatiserade överklaganden kräver databaspersistens.");
   }
 
+  const extractedFromEvidence = input.evidence
+    .map((asset) => asset.extractedText?.trim())
+    .filter(Boolean)
+    .join("\n\n");
+  const enrichedSummary = extractedFromEvidence
+    ? `${sourceSummary}\n\n${extractedFromEvidence}`.trim()
+    : sourceSummary;
+
   const bundle = await requestAutomatedAppealBundle({
     sourceTitle,
-    sourceSummary,
+    sourceSummary: enrichedSummary,
     locale: input.locale || "sv-SE",
     countryCode: input.countryCode || "SE",
   });

@@ -2,13 +2,16 @@ import type { Metadata } from "next";
 import type { AutomatedAppealView } from "@/lib/civic-features";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 import { ModuleHero } from "@/components/ui/ModuleHero";
+import { getProtestModule } from "@/lib/module-manifest";
 import { serverApiJsonSafe } from "@/lib/server-api";
 import { AutomatedAppealWorkbench } from "@/app/byrakrati-bombaren/AutomatedAppealWorkbench";
 import { BureaucracyTabs } from "@/app/byrakrati-bombaren/BureaucracyTabs";
 
+const mod = getProtestModule("automatiserad-overklagare")!;
+
 export const metadata: Metadata = {
-  title: "Automatiserad överklagare",
-  description: "Ladda upp myndighetsbeslut och låt AI generera överklaganden, JO-anmälningar och handlingbegäran.",
+  title: mod.shortTitle,
+  description: mod.description,
 };
 
 export default async function AutomatedAppealPage() {
@@ -26,11 +29,11 @@ export default async function AutomatedAppealPage() {
       />
       <div className="shell space-y-10 pb-20 pt-4 md:pt-6">
         <ModuleHero
-          description="Ladda upp eller klistra in ett beslut. AI skriver överklagande, klagomål och begäran om handling — du väljer om du bara vill ha utkast eller skicka vidare."
-          eyebrow="AI-verktyg"
+          description={`${mod.description} ${mod.extremLangfinger}`}
+          eyebrow={mod.eyebrow}
           primaryAction={{ href: "/byrakrati-bombaren", label: "Massutskick" }}
           secondaryAction={{ href: "/konto", label: "Mina ärenden" }}
-          title="Automatiserad överklagare"
+          title={mod.title}
         />
         <BureaucracyTabs />
         <AutomatedAppealWorkbench initialItems={automatedAppeals} />

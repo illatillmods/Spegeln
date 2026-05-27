@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import type { ConfidenceBoardEntry } from "@/lib/civic-features";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
+import { getProtestModule } from "@/lib/module-manifest";
 import { serverApiJsonSafe } from "@/lib/server-api";
 import { FolketsDomstolClientShell } from "./FolketsDomstolClientShell";
 
+const mod = getProtestModule("folkets-domstol")!;
+
 export const metadata: Metadata = {
-  title: "Folkets domstol",
-  description: "Publik tryckmätning, vittnesmål och trenddata för myndigheter och tjänstemän.",
+  title: mod.shortTitle,
+  description: mod.description,
 };
 
 type PageProps = {
@@ -25,9 +28,9 @@ export default async function PublicConfidencePage({ searchParams }: PageProps) 
       <Breadcrumbs items={[{ href: "/", label: "Start" }, { label: "Folkets domstol" }]} />
       <div className="shell space-y-10 pb-20 pt-4 md:pt-6">
         <section className="space-y-5 reveal">
-          <p className="eyebrow">Folkets domstol</p>
-          <h1 className="max-w-4xl font-title text-5xl leading-none sm:text-6xl">Anonym tryckmätning med öppna trender och vittnesmål.</h1>
-          <p className="max-w-3xl text-(--muted) text-lg leading-8">Sök person eller myndighet — inga tekniska ID krävs.</p>
+          <p className="eyebrow">{mod.eyebrow}</p>
+          <h1 className="max-w-4xl font-title text-5xl leading-none sm:text-6xl">{mod.title}</h1>
+          <p className="max-w-3xl text-(--muted) text-lg leading-8">{mod.description} {mod.extremLangfinger}</p>
         </section>
         <FolketsDomstolClientShell
           initialItems={initialItems}

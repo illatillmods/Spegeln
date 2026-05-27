@@ -1,5 +1,8 @@
 import React from "react";
 import Link from "next/link";
+import { getProtestModule } from "@/lib/module-manifest";
+
+const mod = getProtestModule("skatteplanering")!;
 
 export default function SkatteplaneringPage() {
   const highlights = [
@@ -21,10 +24,10 @@ export default function SkatteplaneringPage() {
     <div className="shell space-y-12 pb-20 pt-10 md:pt-14">
       <section className="grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-start">
         <div className="space-y-5 reveal">
-          <p className="eyebrow">Specialverktyg</p>
-          <h1 className="max-w-4xl font-title text-5xl leading-none sm:text-6xl">Skatteplaneringsmaskinen samlar onboarding, analys och rapport i ett rakt flöde.</h1>
+          <p className="eyebrow">{mod.eyebrow}</p>
+          <h1 className="max-w-4xl font-title text-5xl leading-none sm:text-6xl">{mod.title}</h1>
           <p className="max-w-3xl text-(--muted) text-lg leading-8">
-            Den här modulen ska kännas som ett fokuserat arbetsverktyg, inte som en separat webbplats. Börja med onboarding, kör analysen och lås upp fördjupning först när resultatet är värt det.
+            {mod.description} {mod.extremLangfinger}
           </p>
           <div className="flex flex-wrap gap-3">
             <Link className="btn-primary" href="/skatteplanering/onboarding">Kom igång</Link>

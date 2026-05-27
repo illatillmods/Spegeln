@@ -38,7 +38,7 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
     <div className="shell space-y-10 pb-20 pt-4 md:pt-6">
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr] xl:items-start">
         <div className="space-y-5 reveal">
-          <p className="eyebrow">Offentlig granskningsprofil</p>
+          <p className="eyebrow">Övervakningsprofil</p>
           <h1 className="font-title text-5xl leading-none sm:text-6xl">{profile.fullName}</h1>
           <p className="text-(--muted) text-lg leading-8">{profile.title} · {profile.authorityName}</p>
           <p className="max-w-3xl text-(--muted) text-lg leading-8">{profile.summary}</p>
@@ -89,8 +89,22 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
             <div className="mt-5 space-y-3 text-sm leading-7">
               <div>
                 <p className="font-semibold">Publik signalbild</p>
-                <p className="text-(--muted)">{profile.trust.upvotes} upp, {profile.trust.downvotes} ned och {profile.trust.testimonials} godkända vittnesmål. Det här är kontext, inte domslut.</p>
+                <p className="text-(--muted)">{profile.trust.upvotes} upp, {profile.trust.downvotes} ned och {profile.trust.testimonials} godkända vittnesmål i Folkets domstol.</p>
               </div>
+              {profile.courtTestimonials.length > 0 ? (
+                <div>
+                  <p className="font-semibold">Folkets domstol — vittnesmål</p>
+                  <div className="mt-3 space-y-3">
+                    {profile.courtTestimonials.map((testimonial) => (
+                      <article className="rounded-2xl border border-[rgba(22,32,42,0.08)] bg-white/75 p-3" key={`${testimonial.headline}-${testimonial.createdAt}`}>
+                        <p className="font-medium">{testimonial.headline}</p>
+                        <p className="mt-1 text-(--muted) text-sm leading-6">{testimonial.body}</p>
+                        <p className="mt-2 text-(--muted) text-xs">{formatDate(testimonial.createdAt)}</p>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div>
                 <p className="font-semibold">Granskningsärenden</p>
                 <p className="text-(--muted)">{profile.failureReports} registrerade ärenden kopplade till tjänsterollen eller myndighetsytan.</p>

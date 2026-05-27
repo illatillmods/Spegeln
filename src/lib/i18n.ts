@@ -69,11 +69,15 @@ export function normalizeLocale(input?: string | null): AppLocale {
 }
 
 export async function getCurrentLocale() {
-  const { cookies, headers } = await import("next/headers");
+  const { cookies } = await import("next/headers");
   const cookieStore = await cookies();
-  const headerStore = await headers();
+  const cookieValue = cookieStore.get(LOCALE_COOKIE_NAME)?.value;
 
-  return normalizeLocale(cookieStore.get(LOCALE_COOKIE_NAME)?.value || headerStore.get("accept-language"));
+  if (!cookieValue) {
+    return "sv";
+  }
+
+  return normalizeLocale(cookieValue);
 }
 
 export function getDictionary(locale: AppLocale) {

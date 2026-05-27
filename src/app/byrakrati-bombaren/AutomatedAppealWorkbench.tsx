@@ -29,6 +29,7 @@ export function AutomatedAppealWorkbench({ initialItems }: Props) {
   const [recipient, setRecipient] = useState<EntityOption | null>(null);
   const [selectedRecipients, setSelectedRecipients] = useState<EntityOption[]>([]);
   const [files, setFiles] = useState<FileList | null>(null);
+  const [extractPreview, setExtractPreview] = useState("");
   const [submissionMode, setSubmissionMode] = useState<"draft" | "submit">("draft");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +85,7 @@ export function AutomatedAppealWorkbench({ initialItems }: Props) {
     setSenderEmail("");
     setSelectedRecipients([]);
     setFiles(null);
+    setExtractPreview("");
     setPending(false);
   }
 
@@ -113,7 +115,20 @@ export function AutomatedAppealWorkbench({ initialItems }: Props) {
             ))}
           </div>
         </div>
-        <FileUploadZone helper="PDF, bild eller dokument som underlag till AI-analysen." multiple onChange={setFiles} />
+        <FileUploadZone
+          helper="PDF, bild eller dokument som underlag till AI-analysen."
+          multiple
+          onChange={(nextFiles) => {
+            setFiles(nextFiles);
+            void readTextFromFiles(nextFiles).then((text) => setExtractPreview(text));
+          }}
+        />
+        {extractPreview ? (
+          <div className="rounded-3xl border border-[rgba(22,32,42,0.08)] bg-white/80 p-4">
+            <p className="eyebrow">Extraherad text</p>
+            <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap text-xs leading-6">{extractPreview.slice(0, 2000)}</pre>
+          </div>
+        ) : null}
         <div className="grid grid-cols-2 gap-3">
           <button className={`btn-secondary ${submissionMode === "draft" ? "ring-2 ring-[rgba(15,118,110,0.2)]" : ""}`} onClick={() => setSubmissionMode("draft")} type="button">
             Bara utkast

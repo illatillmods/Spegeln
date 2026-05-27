@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { WikiPageView } from "@/lib/civic-features";
 import { FormError, LoadingButton } from "@/components/ui/FormControls";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { WikiVoteButtons } from "./WikiVoteButtons";
 
 type Props = {
   initialItems: WikiPageView[];
@@ -29,6 +30,28 @@ export function LoopholesWikiClient({ initialItems }: Props) {
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [categoryFilter, setCategoryFilter] = useState("all");
+
+  const categories = useMemo(
+    () => Array.from(new Set(items.map((item) => item.category))).sort(),
+    [items],
+  );
+
+  const filteredItems = useMemo(
+    () => (categoryFilter === "all" ? items : items.filter((item) => item.category === categoryFilter)),
+    [categoryFilter, items],
+  );
+
+  useEffect(() => {
+    void fetch("/api/statens-svagheter/pages")
+      .then((response) => response.json())
+      .then((data) => {
+        if (Array.isArray(data.items)) {
+          setItems(data.items);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -71,7 +94,7 @@ export function LoopholesWikiClient({ initialItems }: Props) {
     <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
       <form className="surface rounded-4xl p-6 md:p-8 space-y-3" onSubmit={handleSubmit}>
         <p className="eyebrow">Folkets wiki</p>
-        <h2 className="font-title text-4xl">Skriv ett nytt angreppsspår.</h2>
+        <h2 className="font-title text-4xl">Dokumentera statens svagheter och sprid kunskapen.</h2>
         <input className="input" placeholder="Titel" required value={title} onChange={(event) => { setTitle(event.target.value); if (!slug) setSlug(slugify(event.target.value)); }} />
         <input className="input" placeholder="Slug (valfritt, genereras från titel)" value={slug} onChange={(event) => setSlug(event.target.value)} />
         <input className="input" placeholder="Kort sammanfattning" required value={summary} onChange={(event) => setSummary(event.target.value)} />
@@ -85,20 +108,41 @@ export function LoopholesWikiClient({ initialItems }: Props) {
       </form>
 
       <section className="space-y-4">
-        {items.length === 0 ? (
+        <div className="flex flex-wrap gap-2">
+          <button
+            className={`rounded-full px-3 py-1 text-xs ${categoryFilter === "all" ? "bg-(--foreground) text-white" : "tag"}`}
+            onClick={() => setCategoryFilter("all")}
+            type="button"
+          >
+            Alla
+          </button>
+          {categories.map((entry) => (
+            <button
+              className={`rounded-full px-3 py-1 text-xs ${categoryFilter === entry ? "bg-(--foreground) text-white" : "tag"}`}
+              key={entry}
+              onClick={() => setCategoryFilter(entry)}
+              type="button"
+            >
+              {entry}
+            </button>
+          ))}
+        </div>
+        {filteredItems.length === 0 ? (
           <EmptyState description="Skriv första artikeln eller kör databas-seed." title="Inga wiki-artiklar" />
         ) : (
-          items.map((item) => (
-            <Link className="block surface rounded-4xl p-5 transition hover:-translate-y-0.5" href={`/statens-svagheter/${item.slug}`} key={item.id}>
+          filteredItems.map((item) => (
+            <article className="surface rounded-4xl p-5" key={item.id}>
               <div className="flex items-start justify-between gap-4">
-                <div>
+                <Link className="block flex-1 transition hover:-translate-y-0.5" href={`/statens-svagheter/${item.slug}`}>
                   <p className="eyebrow">{item.category}</p>
                   <h3 className="mt-2 text-2xl font-semibold">{item.title}</h3>
-                </div>
-                <span className="tag">Score {item.score}</span>
+                  <p className="mt-3 text-(--muted) text-sm leading-7">{item.summary}</p>
+                </Link>
               </div>
-              <p className="mt-3 text-(--muted) text-sm leading-7">{item.summary}</p>
-            </Link>
+              <div className="mt-4">
+                <WikiVoteButtons initialScore={item.score} pageId={item.id} />
+              </div>
+            </article>
           ))
         )}
       </section>

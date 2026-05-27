@@ -7,7 +7,17 @@ import type { SessionUser } from "@/lib/auth";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Breadcrumbs } from "@/components/ui/Breadcrumbs";
 
-type AccountTab = "bevakningar" | "batcher" | "rapporter" | "video" | "wiki" | "skatt";
+type AccountTab = "notiser" | "bevakningar" | "batcher" | "rapporter" | "video" | "wiki" | "skatt";
+
+type AccountNotification = {
+  id: string;
+  kind: string;
+  title: string;
+  summary: string;
+  href: string;
+  createdAt: string;
+  status: string;
+};
 
 type ServerWatch = {
   id: string;
@@ -25,6 +35,7 @@ type TaxAnalysisItem = {
 };
 
 const tabs: Array<{ id: AccountTab; label: string }> = [
+  { id: "notiser", label: "Notiser" },
   { id: "bevakningar", label: "Bevakningar" },
   { id: "batcher", label: "Batcher" },
   { id: "rapporter", label: "Rapporter" },
@@ -39,6 +50,7 @@ export function AccountClient({ user }: { user: SessionUser | null }) {
   const [tab, setTab] = useState<AccountTab>(initialTab);
   const [watches, setWatches] = useState<ServerWatch[]>([]);
   const [taxAnalyses, setTaxAnalyses] = useState<TaxAnalysisItem[]>([]);
+  const [notifications, setNotifications] = useState<AccountNotification[]>([]);
   const [overview, setOverview] = useState<{ batches: number; reports: number; videos: number; wiki: number; tax: number; watches: number } | null>(null);
 
   useEffect(() => {
@@ -54,11 +66,13 @@ export function AccountClient({ user }: { user: SessionUser | null }) {
       fetch("/api/konto/overview").then((response) => response.json()),
       fetch("/api/konto/watches").then((response) => response.json()),
       fetch("/api/konto/tax-analyses").then((response) => response.json()),
+      fetch("/api/konto/notifications").then((response) => response.json()),
     ])
-      .then(([overviewData, watchesData, taxData]) => {
+      .then(([overviewData, watchesData, taxData, notificationsData]) => {
         setOverview(overviewData);
         setWatches(Array.isArray(watchesData.items) ? watchesData.items : []);
         setTaxAnalyses(Array.isArray(taxData.items) ? taxData.items : []);
+        setNotifications(Array.isArray(notificationsData.items) ? notificationsData.items : []);
       })
       .catch(() => {
         setOverview(null);
@@ -93,6 +107,24 @@ export function AccountClient({ user }: { user: SessionUser | null }) {
           </button>
         ))}
       </nav>
+
+      {tab === "notiser" ? (
+        <section className="surface rounded-4xl p-6 space-y-3">
+          <p className="eyebrow">Notiscenter</p>
+          {notifications.length === 0 ? (
+            <EmptyState description="Nya batcher, rapporter och överklaganden dyker upp här." title="Inga notiser ännu" />
+          ) : (
+            notifications.map((notification) => (
+              <Link className="block rounded-3xl border border-[rgba(22,32,42,0.08)] bg-white/80 p-4" href={notification.href} key={notification.id}>
+                <p className="eyebrow">{notification.kind}</p>
+                <h3 className="font-semibold">{notification.title}</h3>
+                <p className="mt-1 text-(--muted) text-sm">{notification.summary}</p>
+                <p className="mt-2 text-(--muted) text-xs">{new Date(notification.createdAt).toLocaleString("sv-SE")} · {notification.status}</p>
+              </Link>
+            ))
+          )}
+        </section>
+      ) : null}
 
       {tab === "bevakningar" ? (
         <section className="surface rounded-4xl p-6 space-y-3">
@@ -140,7 +172,7 @@ export function AccountClient({ user }: { user: SessionUser | null }) {
           <p className="eyebrow">Videoinlämningar</p>
           <p className="mt-2 text-(--muted) text-sm">{overview ? `${overview.videos} videospår i systemet.` : "Laddar..."}</p>
           <Link className="btn-secondary mt-4 inline-flex" href="/reverse-surveillance">
-            Ladda upp video
+            Ladda upp motbevakning
           </Link>
         </section>
       ) : null}

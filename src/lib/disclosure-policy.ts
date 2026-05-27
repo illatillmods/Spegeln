@@ -8,10 +8,10 @@ export type DisclosureBoundary = {
 };
 
 export const disclosureProfileNotice =
-  "Profilen visar verifierade uppgifter från offentliga källor och plattformens granskade spår. Privata hemadresser och obekräftade anklagelser publiceras inte.";
+  "Profilen publicerar offentlig information om makthavare — inkomster, roller, relationer och dokumenterade beslut. Privata hemadresser och obekräftade anklagelser blockeras så att trycket träffar rätt.";
 
 export const disclosureIndexNotice =
-  "Index och nätverksvyer bygger på samma publiceringsgränser: offentliga roller, dokumenterade kopplingar och godkända källor — inte rykten eller rå tipsfritext.";
+  "Index och nätverksvyer bygger på samma offentliga källor som övervakningsspegeln. Poängen är att vända kameran mot makten — inte att sprida rykten.";
 
 export function getDisclosureBoundaries(): DisclosureBoundary[] {
   return [

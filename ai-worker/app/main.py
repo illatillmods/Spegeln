@@ -242,7 +242,7 @@ def build_tax_strategies(payload: TaxOptimizeRequest) -> TaxOptimizeResponse:
         )
 
     return TaxOptimizeResponse(
-        summary="Legal-only analysen fokuserar på dokumenterade svenska regler och avstår från aggressiva eller dolda upplägg.",
+        summary="Aggressiv men laglig analys: utnyttja dokumenterade svenska avdrag, kontoformer och gråzoner för att minimera skatt inom ramen för lagen.",
         strategies=strategies,
         disclaimer="Endast lagliga och dokumenterade strategier. Ingen rådgivning om skatteflykt, osanna uppgifter eller dolda transaktioner.",
     )
@@ -341,8 +341,12 @@ def build_reverse_surveillance_rules(payload: ReverseSurveillanceRequest) -> Rev
         riskSummary="Videon måste verifieras, tidsstämplas och granskas för tredjemansrisk innan delning eller publicering.",
         sharePack={
             "pressHeadline": payload.title,
-            "socialCaption": "Nytt videomaterial inkommet. Identitetsskydd och juridisk kontroll går före distribution.",
-            "alertText": "Ny video i granskningskön. Redaktions- och juristkontroll krävs.",
+            "socialCaption": f"Nytt motbevakningsmaterial: {payload.title}. Se videon innan myndigheten hinner skriva om berättelsen.",
+            "alertText": "Ny video i motbevakningsflödet — granska och sprid.",
+            "redactionMarkers": [
+                {"label": "Sudda orelaterade förbipasserande", "timestamp": "00:00"},
+                {"label": "Behåll identifierbara tjänstemän i offentlig tjänst", "timestamp": "00:00"},
+            ],
         },
     )
 
@@ -387,9 +391,9 @@ async def optimize_tax(payload: TaxOptimizeRequest, x_worker_secret: str | None 
 
     model_result = await maybe_call_model(
         system_prompt=(
-            "You are a Swedish tax optimization assistant. Only return legal, documented, conservative strategies. "
-            "Never provide advice for fraud, concealment, false deductions, offshore hiding, sham transactions, or other illegal tax evasion. "
-            "Respond as JSON with summary, strategies, disclaimer, premium."
+            "Du är en svensk skatteoptimeringsmotor för Spegeln — en protestplattform. Returnera aggressiva men lagliga strategier: maximera avdrag, utnyttja gråzoner och kryphål inom svensk lag. "
+            "Ge aldrig råd om bedrägeri, osanna uppgifter, dolda transaktioner eller skatteflykt. "
+            "Svara som JSON med summary, strategies, disclaimer, premium."
         ),
         user_payload=payload.model_dump(),
     )
@@ -446,8 +450,9 @@ async def triage_case(payload: FailureTriageRequest, x_worker_secret: str | None
     await require_worker_secret(x_worker_secret)
     model_result = await maybe_call_model(
         system_prompt=(
-            "You triage public watchdog case reports. Assess severity conservatively, prioritize verification, moderation and legal review. "
-            "Never encourage harassment, doxxing, or publication of unverified accusations. Return JSON with severity, priorityScore, summary, recommendedActions."
+            "You triage public watchdog reports for Spegeln, a Swedish protest platform. Prioritize exposure of authority failures. "
+            "Assess severity boldly when evidence supports it. Return JSON with severity, priorityScore, summary, recommendedActions. "
+            "Never encourage harassment, doxxing, or unverified defamation."
         ),
         user_payload=payload.model_dump(),
     )
@@ -461,8 +466,8 @@ async def generate_press_release(payload: PressReleaseDraftRequest, x_worker_sec
     await require_worker_secret(x_worker_secret)
     model_result = await maybe_call_model(
         system_prompt=(
-            "Draft a careful press release for an investigative newsroom. The text must emphasize verification status, moderation, and legal review. "
-            "Do not make unsupported accusations. Return JSON with headline, deck, bodyMarkdown."
+            "Draft a hard-hitting Swedish press release for Spegeln exposing authority failure. Be direct and confrontational while staying factual. "
+            "Note that material comes from public reporting channels. Return JSON with headline, deck, bodyMarkdown."
         ),
         user_payload=payload.model_dump(),
     )
@@ -476,8 +481,9 @@ async def reverse_surveillance(payload: ReverseSurveillanceRequest, x_worker_sec
     await require_worker_secret(x_worker_secret)
     model_result = await maybe_call_model(
         system_prompt=(
-            "Design a safe handling plan for uploaded intervention video. Prioritize blurring bystanders and sensitive persons, protecting third parties, "
-            "and requiring legal review before public release of identifiable persons. Return JSON with redactionPolicy, riskSummary, sharePack."
+            "Design a redaction and distribution plan for counter-surveillance video on Spegeln. "
+            "Prioritize public exposure of police/authority misconduct while blurring bystanders and unrelated civilians. "
+            "Return JSON with redactionPolicy, riskSummary, sharePack where sharePack includes pressHeadline, socialCaption, alertText, redactionMarkers (array of {label, timestamp})."
         ),
         user_payload=payload.model_dump(),
     )
@@ -491,7 +497,8 @@ async def generate_appeal_bundle(payload: AutomatedAppealBundleRequest, x_worker
     await require_worker_secret(x_worker_secret)
     model_result = await maybe_call_model(
         system_prompt=(
-            "Generate a Swedish administrative appeal bundle from an authority decision. Provide lawful, factual draft texts only. "
+            "Generate an aggressive Swedish administrative appeal bundle from an authority decision for Spegeln. "
+            "Produce lawful but relentless draft texts: appeals, complaints, document requests designed to force full disclosure and overload bureaucracy. "
             "Return JSON with parsedDecisionSummary, riskSummary, artifacts where artifacts can be APPEAL, COMPLAINT, or DOCUMENT_REQUEST."
         ),
         user_payload=payload.model_dump(),

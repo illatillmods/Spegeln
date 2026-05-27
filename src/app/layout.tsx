@@ -44,44 +44,44 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     { href: "/overvakningsspegeln", label: "Utforska" },
     { href: "/byrakrati-bombaren", label: "Agera" },
     { href: "/myndighetsgranskaren", label: "Bidra" },
-    { href: "/insynsindex", label: "Index" },
-    { href: "/guider", label: "Guide" },
+    { href: "/insynsindex", label: "Insynsindex" },
+    { href: "/guider", label: "Guider" },
   ];
   const moduleNavigation = [
     {
       href: "/automatiserad-overklagare",
       label: "Automatiserad överklagare",
-      summary: "AI skriver överklaganden från dina beslut.",
+      summary: "AI som överklagar allt — överbelasta byråkratin lagligt.",
     },
     {
       href: "/byrakrati-bombaren",
       label: "Byråkrati-bombaren",
-      summary: "Samordnat mottryck, batcher och utskick.",
+      summary: "Legal DDOS: massöverklagan i batch.",
     },
     {
       href: "/myndighetsgranskaren",
       label: "Myndighetsgranskaren",
-      summary: locale === "en" ? "Reports, evidence, and escalation." : "Rapporter, bevis och upptrappning.",
+      summary: locale === "en" ? "Auto-publish authority failures." : "Publicera myndighetsmisslyckanden automatiskt.",
     },
     {
       href: "/reverse-surveillance",
       label: "Motbevakning",
-      summary: "Motbilder, videospår och offentlig press.",
+      summary: "Övervakningskamera mot polisen — sprid motbilder.",
     },
     {
       href: "/folkets-domstol",
       label: "Folkets domstol",
-      summary: locale === "en" ? "Voting, testimony, and public pressure." : "Röster, vittnesmål och folktryck.",
+      summary: locale === "en" ? "Parallel court for power holders." : "Parallellt rättssystem mot makthavare.",
     },
     {
       href: "/statens-svagheter",
       label: "Statens svagheter",
-      summary: locale === "en" ? "Community wiki and exposed weak points." : "Wiki för kryphål, taktik och blottlagda mönster.",
+      summary: locale === "en" ? "Wiki of loopholes and weak points." : "Wiki över kryphål och sårbarheter.",
     },
     {
       href: "/skatteplanering",
-      label: locale === "en" ? "Tax planning" : "Skatteplanering",
-      summary: locale === "en" ? "AI-guided optimization workspace." : "AI-styrd optimering och rapporter.",
+      label: "Skatteplaneringsmaskinen",
+      summary: locale === "en" ? "Aggressive tax optimization AI." : "Aggressiv AI för skatteoptimering.",
     },
   ];
   const supportNavigation = [

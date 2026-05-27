@@ -73,6 +73,7 @@ export type ReverseSurveillanceResult = {
     pressHeadline: string;
     socialCaption: string;
     alertText: string;
+    redactionMarkers?: Array<{ label: string; timestamp?: string }>;
   };
 };
 

@@ -49,6 +49,7 @@ export function AdminWatchdogImport() {
       <h2 className="mt-2 font-title text-3xl">Importera myndigheter och tjänstepersoner</h2>
       <p className="mt-3 text-(--muted) text-sm leading-7">
         Klistra in JSON-rader med fält: authorityName, authoritySlug, officialName, officialTitle, category, region.
+        Schemalagd ingestion körs via <code className="text-xs">POST /api/admin/watchdog/ingest-cron</code> med header <code className="text-xs">x-cron-secret</code> och env <code className="text-xs">WATCHDOG_INGEST_URL</code>.
       </p>
       <textarea className="input mt-4 min-h-48 font-mono text-xs" onChange={(event) => setRowsJson(event.target.value)} value={rowsJson} />
       <button className="btn-primary mt-4" disabled={pending} onClick={() => void handleImport()} type="button">

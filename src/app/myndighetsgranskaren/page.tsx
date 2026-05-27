@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import type { FailureReportView } from "@/lib/civic-features";
 import { ModuleHero } from "@/components/ui/ModuleHero";
+import { getProtestModule } from "@/lib/module-manifest";
 import { serverApiJson } from "@/lib/server-api";
 import { AuthorityFailuresClient } from "./Client";
 
+const mod = getProtestModule("myndighetsgranskaren")!;
+
 export const metadata: Metadata = {
-  title: "Myndighetsgranskaren",
-  description: "Anonym rapportering, AI-triage och pressbara spår för myndighetsfel och skandaler.",
+  title: mod.shortTitle,
+  description: mod.description,
 };
 
 export default async function AuthorityFailuresPage() {
@@ -16,9 +19,9 @@ export default async function AuthorityFailuresPage() {
   return (
     <div className="shell space-y-10 pb-20 pt-10 md:pt-14">
       <ModuleHero
-        description="Varje ärende får AI-triage, pressbara sammanfattningar och en tydlig väg vidare till feed, profil eller batch när systemet behöver svara."
-        eyebrow="Myndighetsgranskaren"
-        title="Anonym bevisinhämtning som sätter maktmissbruk under tryck."
+        description={`${mod.description} ${mod.extremLangfinger}`}
+        eyebrow={mod.eyebrow}
+        title={mod.title}
       />
       <AuthorityFailuresClient initialItems={initialItems} />
     </div>
