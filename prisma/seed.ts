@@ -1,5 +1,7 @@
 import "dotenv/config";
 import bcrypt from "bcryptjs";
+import { PrismaPg } from "@prisma/adapter-pg";
+import { Pool } from "pg";
 import {
   AlertSeverity,
   AppealAutomationStatus,
@@ -17,7 +19,12 @@ import {
   WikiPageStatus,
 } from "@prisma/client";
 
-const prisma = new PrismaClient();
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL saknas. Sätt den i .env innan du kör db:seed.");
+}
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const prisma = new PrismaClient({ adapter: new PrismaPg(pool) });
 
 async function main() {
   const adminPassword = await bcrypt.hash("SpegelnDemo2026!", 12);
@@ -409,4 +416,5 @@ main()
   })
   .finally(async () => {
     await prisma.$disconnect();
+    await pool.end();
   });

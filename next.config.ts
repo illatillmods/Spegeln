@@ -1,6 +1,18 @@
 import type { NextConfig } from "next";
 
-const backendProxyTarget = process.env.BACKEND_URL?.replace(/\/$/, "") || (process.env.NODE_ENV === "development" ? "http://127.0.0.1:4000" : "");
+function normalizeBackendUrl(value?: string) {
+  const trimmed = value?.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  const withProtocol = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  return withProtocol.replace(/\/$/, "");
+}
+
+const backendProxyTarget =
+  normalizeBackendUrl(process.env.BACKEND_URL) ||
+  (process.env.NODE_ENV === "development" ? "http://127.0.0.1:4000" : "");
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
