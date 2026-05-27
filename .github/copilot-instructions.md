@@ -8,7 +8,7 @@
   The official Next.js scaffolder was attempted first but failed because the workspace folder name contains an uppercase letter. The project was scaffolded manually in the current root with package name `spegeln`.
 
 - [x] Customize the Project
-  Added Swedish product pages, pricing, legal content, modern visual design, Prisma schema, Vercel/Railway deployment support, optional Docker fallback and project documentation.
+  Added Swedish product pages, pricing, legal content, modern visual design, Prisma schema, Vercel frontend support, Railway backend and worker services, and updated project documentation.
 
 - [x] Install Required Extensions
   No required extensions were provided by the project setup information.

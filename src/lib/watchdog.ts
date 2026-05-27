@@ -1,3 +1,5 @@
+import { getDisclosureBoundaries } from "@/lib/disclosure-policy";
+import { getPrismaClient } from "@/lib/prisma";
 import {
   AlertSeverity,
   ModerationDecision,
@@ -6,13 +8,6 @@ import {
   TrustVoteDirection,
   type AuthorityCategory,
 } from "@prisma/client";
-import {
-  getMockAuthorities,
-  getMockIndividualProfile,
-  getMockIndividuals,
-  getMockWatchdogSnapshot,
-} from "@/lib/mockdata";
-import { getPrismaClient } from "@/lib/prisma";
 
 export type WatchChannel = "email" | "browser" | "rss";
 export type WatchCadence = "REALTIME" | "HOURLY" | "DAILY";
@@ -76,6 +71,38 @@ export type WatchCoverageItem = {
   status: string;
   lastActivityAt: string;
   note: string;
+  sourceUrl?: string | null;
+  legalBasis?: string;
+};
+
+export type WatchPublicFact = {
+  id: string;
+  label: string;
+  values: string[];
+  note: string;
+};
+
+export type WatchRelationship = {
+  id: string;
+  name: string;
+  category: string;
+  relationship: string;
+  publicBasis: string;
+  overlap: string;
+  recordCount: number;
+};
+
+export type WatchDisclosureBoundary = {
+  id: string;
+  label: string;
+  status: "Visas" | "Maskas" | "Blockeras";
+  reason: string;
+};
+
+export type WatchVerdict = {
+  court: string;
+  description: string;
+  date: string;
 };
 
 export type WatchTimelineEvent = {
@@ -127,6 +154,7 @@ export type WatchProfile = {
   id: string;
   fullName: string;
   title: string;
+  authorityId: string;
   authorityName: string;
   authoritySlug: string;
   summary: string;
@@ -140,10 +168,14 @@ export type WatchProfile = {
   lastDailySyncAt: string;
   refreshPolicy: string;
   coverage: WatchCoverageItem[];
+  publicFacts: WatchPublicFact[];
+  relationships: WatchRelationship[];
+  disclosureBoundaries: WatchDisclosureBoundary[];
   patternSignals: WatchPatternSignal[];
   timeline: WatchTimelineEvent[];
   alerts: WatchAlertItem[];
   recordDigests: WatchRecordDigest[];
+  verdicts: WatchVerdict[];
   trust: WatchTrustSnapshot;
   watchTarget: WatchTargetSummary;
 };
@@ -258,111 +290,15 @@ function buildOfficialWatchTarget(officialId: string, officialName: string): Wat
   };
 }
 
-async function getFallbackAuthorities(): Promise<WatchAuthorityCard[]> {
-  const authorities = await getMockAuthorities();
-
-  return authorities.map((authority) => ({
-    id: authority.id,
-    slug: authority.slug,
-    name: authority.name,
-    category: authority.category,
-    region: authority.region,
-    summary: authority.summary,
-    monitoredOfficials: authority.monitoredOfficials,
-    totalSignals: authority.totalRecords,
-    publishedReports: Math.max(1, Math.round(authority.totalRecords / 16)),
-    openAlerts: authority.openAlerts,
-    lastSyncAt: authority.lastSyncAt,
-    focusAreas: authority.focusAreas,
-    sourceMix: authority.sourceMix,
-    watchTarget: authority.watchTarget,
-  }));
-}
-
-async function getFallbackPeople(): Promise<WatchDirectoryPerson[]> {
-  const people = await getMockIndividuals();
-
-  return people.map((person) => ({
-    id: person.id,
-    fullName: person.fullName,
-    title: person.title,
-    authorityName: person.authorityName,
-    authoritySlug: "",
-    summary: person.summary,
-    totalSignals: person.totalRecords,
-    monitoredSources: person.monitoredSources,
-    publishedReports: Math.max(1, Math.round(person.totalRecords / 24)),
-    openAlerts: person.openAlerts,
-    lastSyncAt: person.lastSyncAt,
-  }));
-}
-
-async function getFallbackProfile(id: string): Promise<WatchProfile | null> {
-  const profile = await getMockIndividualProfile(id);
-
-  if (!profile) {
-    return null;
-  }
-
-  return {
-    id: profile.id,
-    fullName: profile.fullName,
-    title: profile.title,
-    authorityName: profile.authorityName,
-    authoritySlug: profile.authoritySlug,
-    summary: profile.summary,
-    statusNote: profile.refreshPolicy,
-    totalSignals: profile.totalRecords,
-    monitoredSources: profile.monitoredSources,
-    publishedReports: profile.recordDigests.length,
-    openAlerts: profile.openAlerts,
-    complaints: profile.alerts.length,
-    failureReports: profile.patternSignals.length,
-    lastDailySyncAt: profile.lastDailySyncAt,
-    refreshPolicy: profile.refreshPolicy,
-    coverage: profile.coverage.map((item) => ({
-      id: item.id,
-      label: item.label,
-      category: item.category,
-      cadence: item.cadence,
-      status: item.status,
-      lastActivityAt: item.lastSyncedAt,
-      note: item.note,
-    })),
-    patternSignals: profile.patternSignals,
-    timeline: profile.timeline,
-    alerts: profile.alerts,
-    recordDigests: profile.recordDigests,
-    trust: {
-      confidenceScore: 50,
-      upvotes: 0,
-      downvotes: 0,
-      testimonials: 0,
-    },
-    watchTarget: profile.watchTarget,
-  };
-}
-
-async function getFallbackSnapshot(): Promise<WatchdogSnapshot> {
-  const snapshot = await getMockWatchdogSnapshot();
-
-  return {
-    totalTrackedRecords: snapshot.totalTrackedRecords,
-    officialsCovered: snapshot.officialsCovered,
-    authoritiesCovered: snapshot.authoritiesCovered,
-    publishedReports: Math.max(1, Math.round(snapshot.totalTrackedRecords / 40)),
-    liveAlerts: 11,
-    dailySyncCoverage: snapshot.dailySyncCoverage,
-    publicSourceFamilies: snapshot.publicSourceFamilies,
-    guardrails: snapshot.guardrails,
-  };
+function buildDisclosureBoundaries(): WatchDisclosureBoundary[] {
+  return getDisclosureBoundaries();
 }
 
 export async function getWatchdogAuthorities(): Promise<WatchAuthorityCard[]> {
   const prisma = getPrismaClient();
 
   if (!prisma) {
-    return getFallbackAuthorities();
+    return [];
   }
 
   const authorities = await prisma.authority.findMany({
@@ -449,7 +385,7 @@ export async function getWatchdogPeople(): Promise<WatchDirectoryPerson[]> {
   const prisma = getPrismaClient();
 
   if (!prisma) {
-    return getFallbackPeople();
+    return [];
   }
 
   const officials = await prisma.official.findMany({
@@ -524,7 +460,21 @@ export async function getWatchdogSnapshot(): Promise<WatchdogSnapshot> {
   const prisma = getPrismaClient();
 
   if (!prisma) {
-    return getFallbackSnapshot();
+    return {
+      totalTrackedRecords: 0,
+      officialsCovered: 0,
+      authoritiesCovered: 0,
+      publishedReports: 0,
+      liveAlerts: 0,
+      dailySyncCoverage:
+        "Livevyn uppdateras från databasen med nya offentliga poster, rapporter, klagomål och granskningsärenden så snart de kopplats till rätt spår.",
+      publicSourceFamilies: [],
+      guardrails: [
+        "Visar offentliga poster, publika rapporter och metadata som redan kopplats till plattformens öppna spår.",
+        "Privata hemadresser, familjeuppgifter och obekräftad rådata kapas bort så att fokus stannar på offentlig maktutövning.",
+        "Hög allvarlighetsgrad i feeden betyder att spåret bränner, inte att någon redan är dömd.",
+      ],
+    };
   }
 
   const [officialsCovered, authoritiesCovered, liveAlerts, publishedReports, complaints, failureReports, sources] = await Promise.all([
@@ -546,13 +496,14 @@ export async function getWatchdogSnapshot(): Promise<WatchdogSnapshot> {
     authoritiesCovered,
     publishedReports,
     liveAlerts,
-    dailySyncCoverage: "Livevyn uppdateras från databasen med nya alerts, rapporter, klagomål och moderationsärenden så snart de skrivs in.",
+    dailySyncCoverage:
+      "Livevyn uppdateras från databasen med nya offentliga poster, rapporter, klagomål och granskningsärenden så snart de kopplats till rätt spår.",
     publicSourceFamilies:
       sources.length > 0 ? sources.map((source) => sourceKindLabel(source.sourceKind)) : ["Publikt register", "Rapportflöde"],
     guardrails: [
-      "Visar endast öppna signaler, publika rapporter och metadata som redan finns i plattformens granskningsflöde.",
-      "Personuppgifter ska granskas manuellt innan något går från intern signal till publik publicering.",
-      "Hög allvarlighetsgrad i feeden betyder prioritering i granskning, inte bevisad skuld.",
+      "Visar offentliga poster, publika rapporter och metadata som redan kopplats till plattformens öppna spår.",
+      "Privata hemadresser, familjeuppgifter och obekräftad rådata kapas bort så att fokus stannar på offentlig maktutövning.",
+      "Hög allvarlighetsgrad i feeden betyder att spåret bränner, inte att någon redan är dömd.",
     ],
   };
 }
@@ -561,7 +512,7 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
   const prisma = getPrismaClient();
 
   if (!prisma) {
-    return getFallbackProfile(id);
+    return null;
   }
 
   const official = await prisma.official.findUnique({
@@ -574,7 +525,9 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
               id: true,
               name: true,
               sourceKind: true,
+              baseUrl: true,
               description: true,
+              legalBasisNote: true,
               updatedAt: true,
             },
           },
@@ -782,8 +735,8 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
   if (official.authority.reports.some((item) => item.status === "LEGAL_REVIEW")) {
     patternSignals.push({
       id: `${official.id}-legal-review`,
-      title: "Rapporter under juridisk granskning",
-      summary: "Det finns rapportutkast eller underlag i legal review som ännu inte är publikt släppta.",
+      title: "Rapporter som väntar på nästa tryckvåg",
+      summary: "Det finns rapportutkast eller underlag som ännu inte släppts publikt men redan bygger upp nästa våg av press.",
       status: "Framväxande",
     });
   }
@@ -792,6 +745,7 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
     id: official.id,
     fullName: official.fullName,
     title: official.title,
+    authorityId: official.authority.id,
     authorityName: official.authority.name,
     authoritySlug: official.authority.slug,
     summary:
@@ -819,7 +773,7 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
       official.complaints[0]?.updatedAt,
       official.authority.reports[0]?.updatedAt,
     ]),
-    refreshPolicy: "Profilerna uppdateras från databasen när nya alerts, rapporter, klagomål eller granskningar skrivs in i plattformen.",
+    refreshPolicy: "Profilerna uppdateras från databasen när nya alerts, rapporter, klagomål eller granskningar ger mer bränsle till spåret.",
     coverage: official.authority.sources.map((source) => ({
       id: source.id,
       label: source.name,
@@ -828,7 +782,60 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
       status: "Aktiv",
       lastActivityAt: source.updatedAt.toISOString(),
       note: source.description || `Källfamiljen ${source.name} är kopplad till myndighetsytan och används i granskningsflödet.`,
+      sourceUrl: source.baseUrl,
+      legalBasis: source.legalBasisNote || "Källan används som offentlig grund för att bygga profil, tidslinje och vidare tryck.",
     })),
+    publicFacts: [
+      {
+        id: `${official.id}-role`,
+        label: "Tjänsteroll och ansvarsyta",
+        values: [`${official.title} · ${official.authority.name}`],
+        note: "Tjänsterollen visas för att koppla offentliga poster till korrekt beslutsnivå och myndighetskontext.",
+      },
+      {
+        id: `${official.id}-published`,
+        label: "Publika rapporter och diarieförda poster",
+        values: [
+          `${official.authority._count.reports} publicerade eller aktiva rapportspår`,
+          `${official._count.complaints} klagomål i granskningsflödet`,
+          `${official._count.failureReports} granskningsärenden`,
+        ],
+        note: "Visar bara poster som redan finns i plattformens granskade datalager eller i myndighetens offentliga källkedja.",
+      },
+      {
+        id: `${official.id}-sources`,
+        label: "Anslutna offentliga källfamiljer",
+        values:
+          official.authority.sources.length > 0
+            ? Array.from(new Set(official.authority.sources.map((source) => sourceKindLabel(source.sourceKind))))
+            : ["Publika rapporter", "Klagomålsflöde"],
+        note: "Källfamiljer beskriver vilken typ av offentlig dokumentation som driver profilen. De är inte i sig bevis för ansvar.",
+      },
+    ],
+    relationships: [
+      {
+        id: `${official.id}-authority`,
+        name: official.authority.name,
+        category: "Myndighet",
+        relationship: "Tjänsteroll och beslutsmiljö",
+        publicBasis: "Myndighetsregister och offentlig organisationsdata",
+        overlap: "Profilen ankras till den myndighet där offentliga klagomål, rapporter och alerts registreras.",
+        recordCount:
+          official._count.complaints + official._count.failureReports + official.authority._count.reports + official.authority._count.alerts,
+      },
+      ...official.authority.sources.slice(0, 5).map((source) => ({
+        id: `${official.id}-${source.id}`,
+        name: source.name,
+        category: sourceKindLabel(source.sourceKind),
+        relationship: "Verifierad offentlig källa i granskningskedjan",
+        publicBasis: source.legalBasisNote || "Registrerad bevakningskälla med definierat granskningsändamål",
+        overlap:
+          source.description ||
+          `Källfamiljen ${source.name} används för att verifiera offentliga poster kopplade till tjänsterollen och myndighetsytan.`,
+        recordCount: 1,
+      })),
+    ],
+    disclosureBoundaries: buildDisclosureBoundaries(),
     patternSignals: patternSignals.length > 0
       ? patternSignals
       : [{
@@ -840,6 +847,7 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
     timeline,
     alerts,
     recordDigests,
+    verdicts: [],
     trust,
     watchTarget: buildOfficialWatchTarget(official.id, official.fullName),
   };

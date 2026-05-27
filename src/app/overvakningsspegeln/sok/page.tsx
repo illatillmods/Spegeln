@@ -1,9 +1,10 @@
 import { SearchDirectory } from "@/app/overvakningsspegeln/SearchDirectory";
-import { getWatchdogPeople, getWatchdogSnapshot } from "@/lib/watchdog";
+import type { WatchDirectoryPerson, WatchdogSnapshot } from "@/lib/watchdog";
+import { serverApiJson } from "@/lib/server-api";
 
 export const metadata = {
   title: "Sök person | Övervakningsspegeln",
-  description: "Sök profiler med korrelationsdata, daglig synk och kronologiska offentliga poster.",
+  description: "Sök offentliga granskningsprofiler med källtäckning, relationer och dokumenterade publiceringsgränser.",
 };
 
 type SearchPageProps = {
@@ -12,7 +13,12 @@ type SearchPageProps = {
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const resolvedSearchParams = await searchParams;
-  const [individuals, snapshot] = await Promise.all([getWatchdogPeople(), getWatchdogSnapshot()]);
+  const [individualsResponse, snapshotResponse] = await Promise.all([
+    serverApiJson<{ items: WatchDirectoryPerson[] }>("/api/watchdog/people"),
+    serverApiJson<{ snapshot: WatchdogSnapshot }>("/api/watchdog/snapshot"),
+  ]);
+  const individuals = individualsResponse.items;
+  const snapshot = snapshotResponse.snapshot;
   const initialQuery = typeof resolvedSearchParams.q === "string" ? resolvedSearchParams.q : "";
 
   return (
@@ -20,9 +26,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       <section className="grid gap-6 lg:grid-cols-[1.04fr_0.96fr] lg:items-start">
         <div className="space-y-5 reveal">
           <p className="eyebrow">Profilsök</p>
-          <h1 className="font-title text-5xl leading-none sm:text-6xl">Sök profiler med live-signaler, tidslinje och anslutna källfamiljer.</h1>
+          <h1 className="font-title text-5xl leading-none sm:text-6xl">Sök profiler med offentliga poster, relationer och anslutna källfamiljer.</h1>
           <p className="max-w-3xl text-(--muted) text-lg leading-8">
-            Varje profil visar det som finns i den riktiga datamodellen just nu: klagomål, granskningsärenden, rapporter, alerts och vilka källfamiljer som driver bevakningen.
+            Varje profil visar det som finns i den riktiga datamodellen just nu: klagomål, granskningsärenden, rapporter, alerts, offentliga relationer och varför vissa datatyper hålls tillbaka.
           </p>
         </div>
         <article className="surface-strong rounded-4xl p-6 md:p-8 reveal" style={{ animationDelay: "120ms" }}>

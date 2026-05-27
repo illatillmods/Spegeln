@@ -4,7 +4,7 @@ import { type NextRequest } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
 import { AuthProvider, Role, SubscriptionTier } from "@prisma/client";
 import { recordAuditEvent } from "@/lib/observability";
-import { getPrismaClient } from "./prisma";
+import { getPrismaClient, requirePrismaClient } from "./prisma";
 
 export type SessionUser = {
   id: string;
@@ -20,7 +20,6 @@ export type SessionUser = {
 
 const SESSION_COOKIE_NAME = "spegeln_session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
-const SESSION_SECRET_FALLBACK = "spegeln-dev-session-secret-change-me";
 const POLICY_VERSION = "2026-03";
 
 type SessionPayload = {
@@ -36,7 +35,13 @@ type SessionPayload = {
 };
 
 function getSessionSecret() {
-  return new TextEncoder().encode(process.env.AUTH_SESSION_SECRET || process.env.NEXTAUTH_SECRET || SESSION_SECRET_FALLBACK);
+  const secret = process.env.AUTH_SESSION_SECRET || process.env.NEXTAUTH_SECRET;
+
+  if (!secret) {
+    throw new Error("AUTH_SESSION_SECRET eller NEXTAUTH_SECRET måste vara satt för sessionssignering.");
+  }
+
+  return new TextEncoder().encode(secret);
 }
 
 function serializeSessionUser(user: SessionUser): SessionPayload {
@@ -367,20 +372,7 @@ export async function upsertSocialUser(input: {
 
 export async function createAnonymousUser(preferredLanguage = "sv") {
   const locale = preferredLanguage === "en" ? "en-GB" : "sv-SE";
-  const prisma = getPrismaClient();
-
-  if (!prisma) {
-    return {
-      id: `guest_${crypto.randomUUID()}`,
-      email: guestEmail(),
-      role: "CITIZEN",
-      subscriptionTier: "FREE",
-      locale,
-      authProvider: "ANONYMOUS",
-      isAnonymous: true,
-      marketingConsent: false,
-    } satisfies SessionUser;
-  }
+  const prisma = requirePrismaClient("DATABASE_URL saknas. Anonymt konto kräver databaspersistens.");
 
   const user = await prisma.user.create({
     data: {

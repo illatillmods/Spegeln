@@ -19,6 +19,7 @@ type Props = {
   wikiPages: WikiPageView[];
   snapshot: WatchdogSnapshot;
   authorities: WatchAuthorityCard[];
+  apiReady?: boolean;
 };
 
 type FeedItem = {
@@ -36,6 +37,116 @@ type FeedItem = {
   secondaryHref?: string;
   tags: string[];
 };
+
+const toneClasses = {
+  teal: "tone-teal",
+  amber: "tone-amber",
+  ink: "tone-ink",
+};
+
+const lifecycleLabels: Record<string, string> = {
+  LEGAL_REVIEW: "UNDER TRYCK",
+  PROCESSING: "I RÖRELSE",
+  MODERATION: "INKOMMET",
+  PUBLISHED: "UTE",
+  DRAFT: "UTKAST",
+  DRAFTED: "UTKAST",
+  SUBMITTED: "UTSKICKAT",
+};
+
+const severityLabels: Record<string, string> = {
+  CRITICAL: "MAXTRYCK",
+  HIGH: "HÖG",
+  MEDIUM: "MELLAN",
+  LOW: "LÅG",
+  PROCESSING: "I RÖRELSE",
+};
+
+const startPoints = [
+  {
+    eyebrow: "Utforska",
+    title: "Profiler, tidslinjer och myndighetsytor",
+    summary: "Gå hit när du vill hitta en person, följa en myndighet eller vända ett namn till ett öppet spår på kortast möjliga väg.",
+    href: "/overvakningsspegeln",
+    cta: "Öppna frontlinjen",
+    tone: "teal" as const,
+  },
+  {
+    eyebrow: "Agera",
+    title: "Batcher, överklaganden och nästa steg",
+    summary: "När myndigheter fastnar i blanketter eller mörkar svar är det här du bygger batcherna som pressar tillbaka.",
+    href: "/byrakrati-bombaren",
+    cta: "Öppna motverktygen",
+    tone: "amber" as const,
+  },
+  {
+    eyebrow: "Bidra",
+    title: "Rapporter, video och vittnesmål",
+    summary: "För användare som kommer med material, inte tillstånd. Samlar tips, videobevis och publik respons i samma lager.",
+    href: "/myndighetsgranskaren",
+    cta: "Skicka in moteld",
+    tone: "ink" as const,
+  },
+  {
+    eyebrow: "Jämför",
+    title: "Leaderboard, scorecards och trender",
+    summary: "När du vill mäta trycket mellan flera myndigheter i stället för att fastna i en enskild profil.",
+    href: "/insynsindex",
+    cta: "Öppna indexet",
+    tone: "teal" as const,
+  },
+];
+
+const workspaceGroups = [
+  {
+    eyebrow: "Upptäck",
+    title: "Se vad som händer och vem det berör.",
+    description:
+      "Övervakningsspegeln och Insynsindex hör ihop. Den ena går på djupet i profiler och myndigheter, den andra visar var trycket sprider sig.",
+    tone: "teal" as const,
+    links: [
+      { href: "/overvakningsspegeln/sok", label: "Profilsök" },
+      { href: "/overvakningsspegeln/autoritet", label: "Myndighetskatalog" },
+      { href: "/insynsindex", label: "Scorecards" },
+    ],
+  },
+  {
+    eyebrow: "Agera",
+    title: "Starta batcher och generera nästa drag.",
+    description:
+      "Byråkrati-bombaren är navet för batcher. Dokument, utskick och usage-köp ligger i samma arbetsyta när du vill gå från ilska till handling.",
+    tone: "amber" as const,
+    links: [
+      { href: "/byrakrati-bombaren", label: "Massutskick" },
+      { href: "/prissattning", label: "Usage och planer" },
+      { href: "/skatteplanering", label: "Skatteplanering" },
+    ],
+  },
+  {
+    eyebrow: "Bidra",
+    title: "Skicka in rapporter och videobevis.",
+    description:
+      "Rapportflödena ligger bredvid varandra så att användaren väljer format först: text, dokument eller video som spräcker myndigheternas egen version.",
+    tone: "ink" as const,
+    links: [
+      { href: "/myndighetsgranskaren", label: "Rapportera ärende" },
+      { href: "/reverse-surveillance", label: "Ladda upp video" },
+      { href: "/folkets-domstol", label: "Publik respons" },
+    ],
+  },
+  {
+    eyebrow: "Fördjupa",
+    title: "Läs wiki, folkets signaler och öppna data.",
+    description:
+      "Community-ytorna blir starkare när de ligger nära varandra: wiki, API och folkets signaler bygger samma motbild från olika håll.",
+    tone: "teal" as const,
+    links: [
+      { href: "/statens-svagheter", label: "Wiki" },
+      { href: "/api-dokumentation", label: "API" },
+      { href: "/guider", label: "Arbetsytor" },
+    ],
+  },
+];
 
 function severityPriority(value: string) {
   if (value === "CRITICAL") return 3;
@@ -94,6 +205,7 @@ export function FrontPageLiveClient({
   wikiPages,
   snapshot,
   authorities,
+  apiReady = true,
 }: Props) {
   const [reports, setReports] = useState(initialReports);
   const [videos, setVideos] = useState(initialVideos);
@@ -166,19 +278,52 @@ export function FrontPageLiveClient({
 
     return true;
   });
+  const featuredFeed = filteredFeed.slice(0, 5);
 
   return (
-    <div className="shell space-y-10 pb-20 pt-10 md:pt-14">
-      <section className="grid gap-6 xl:grid-cols-[1.18fr_0.82fr] xl:items-start">
+    <div className="shell space-y-12 pb-20 pt-10 md:pt-14">
+      {!apiReady ? (
+        <div className="rounded-4xl border border-[rgba(194,107,20,0.18)] bg-[rgba(248,227,197,0.7)] px-5 py-4 text-sm leading-7 text-[rgb(112,65,14)] reveal">
+          Backend eller databas svarar inte just nu. Kör <code className="font-mono">npm run db:seed</code> lokalt eller kontrollera drift enligt docs/driftchecklist.md.
+        </div>
+      ) : null}
+
+      <section className="space-y-4 reveal">
+        <p className="eyebrow">Ny här?</p>
+        <h2 className="font-title text-3xl sm:text-4xl">Välj vad du vill göra — gräv, agera, bidra eller jämför.</h2>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {startPoints.map((point) => (
+            <Link className={`surface rounded-[1.6rem] p-5 transition hover:-translate-y-0.5 ${toneClasses[point.tone]}`} href={point.href} key={point.href}>
+              <p className="eyebrow">{point.eyebrow}</p>
+              <h3 className="mt-2 font-title text-2xl">{point.title}</h3>
+              <p className="mt-2 text-(--muted) text-sm leading-6">{point.summary}</p>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr] xl:items-start">
         <div className="space-y-6 reveal">
           <div className="space-y-3">
-            <p className="eyebrow">Livefront för myndighetsgranskning</p>
+            <p className="eyebrow">Spegelns kontrollrum</p>
             <h1 className="max-w-5xl font-title text-5xl leading-none sm:text-6xl lg:text-7xl">
-              Spegeln visar vad som rör sig i systemet just nu.
+              Här börjar trycket mot myndigheter, byråkrati och slutna rum.
             </h1>
             <p className="max-w-3xl text-(--muted) text-lg leading-8 sm:text-xl">
-              När makten mörkar, börjar dokumenten tala. Här möts feeden för nya granskningsärenden, videointag, publika alerts och de myndighetsytor som drar mest uppmärksamhet just nu.
+              Spegeln är inte ett neutralt uppslagsverk. Den är byggd för att hitta spår, vässa dem och leda vidare till rätt verktyg när makten behöver synas mer och skavas hårdare.
             </p>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Link className="btn-primary" href="/overvakningsspegeln/sok">
+              Öppna frontlinjen
+            </Link>
+            <Link className="btn-secondary" href="/guider">
+              Se alla fronter
+            </Link>
+            <Link className="btn-secondary" href="/insynsindex">
+              Öppna Insynsindex
+            </Link>
           </div>
 
           <form action="/overvakningsspegeln/sok" className="surface rounded-4xl p-4 md:p-5">
@@ -219,39 +364,76 @@ export function FrontPageLiveClient({
 
         <aside className="space-y-4 reveal" style={{ animationDelay: "120ms" }}>
           <article className="surface-strong rounded-4xl p-6 md:p-8">
-            <p className="eyebrow">Mest omdebatterade just nu</p>
+            <p className="eyebrow">Börja här</p>
             <div className="mt-5 space-y-3">
-              {confidenceBoard.slice(0, 4).map((entry) => (
-                <Link className="block rounded-3xl border border-[rgba(22,32,42,0.08)] bg-white/75 p-4 transition hover:-translate-y-0.5" href={`/overvakningsspegeln/sok?q=${encodeURIComponent(entry.targetLabel)}`} key={entry.targetId}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h2 className="text-lg font-semibold">{entry.targetLabel}</h2>
-                      <p className="mt-1 text-(--muted) text-sm">{entry.kind === "official" ? "Tjänsteroll" : "Myndighetsyta"}</p>
-                    </div>
-                    <span className="tag">{entry.confidenceScore}%</span>
-                  </div>
+              {startPoints.map((item) => (
+                <Link className={`block rounded-3xl border border-[rgba(22,32,42,0.08)] p-4 transition hover:-translate-y-0.5 ${toneClasses[item.tone]}`} href={item.href} key={item.title}>
+                  <p className="eyebrow">{item.eyebrow}</p>
+                  <h2 className="mt-2 text-lg font-semibold">{item.title}</h2>
+                  <p className="mt-2 text-(--muted) text-sm leading-6">{item.summary}</p>
+                  <span className="mt-4 inline-flex text-sm font-semibold text-(--foreground)">{item.cta}</span>
                 </Link>
               ))}
             </div>
           </article>
 
           <article className="surface rounded-4xl p-6 md:p-8 tone-amber">
-            <p className="eyebrow">Mass action</p>
-            <h2 className="mt-2 font-title text-4xl">Starta nästa batch direkt från arbetsytan.</h2>
+            <p className="eyebrow">Just nu</p>
+            <h2 className="mt-2 font-title text-4xl">Det viktigaste läget i siffror.</h2>
             <p className="mt-3 text-(--muted) text-sm leading-7">
-              Byråkrati-bombaren är kopplad till riktiga batch-, usage- och leveransflöden. Det som saknas är bara dina produktionsnycklar och transportuppgifter.
+              Börja där systemet spricker mest och hoppa vidare dit nästa tryckpunkt finns.
             </p>
-            <Link className="btn-primary mt-6 w-full" href="/byrakrati-bombaren">Öppna Byråkrati-bombaren</Link>
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="metric-card">
+                <p className="eyebrow">Kritiska</p>
+                <p className="mt-1 text-2xl font-semibold">{feed.filter((item) => item.severity === "CRITICAL").length}</p>
+              </div>
+              <div className="metric-card">
+                <p className="eyebrow">Rapporter</p>
+                <p className="mt-1 text-2xl font-semibold">{reports.length}</p>
+              </div>
+              <div className="metric-card">
+                <p className="eyebrow">Video</p>
+                <p className="mt-1 text-2xl font-semibold">{videos.length}</p>
+              </div>
+            </div>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link className="btn-primary" href="/byrakrati-bombaren">Öppna Byråkrati-bombaren</Link>
+              <Link className="btn-secondary" href="/myndighetsgranskaren">Öppna rapportflödet</Link>
+            </div>
           </article>
         </aside>
+      </section>
+
+      <section className="space-y-5 reveal">
+        <div>
+          <p className="eyebrow">Produktkarta</p>
+          <h2 className="mt-2 font-title text-4xl sm:text-5xl">Fyra fronter som gör resten av sajten begriplig.</h2>
+        </div>
+        <div className="grid gap-4 xl:grid-cols-2">
+          {workspaceGroups.map((group, index) => (
+            <article className={`surface rounded-4xl p-6 md:p-8 ${toneClasses[group.tone]} reveal`} key={group.title} style={{ animationDelay: `${index * 90}ms` }}>
+              <p className="eyebrow">{group.eyebrow}</p>
+              <h3 className="mt-3 font-title text-4xl">{group.title}</h3>
+              <p className="mt-4 text-(--muted) text-sm leading-7">{group.description}</p>
+              <div className="mt-5 flex flex-wrap gap-2 text-xs">
+                {group.links.map((link) => (
+                  <Link className="tag transition hover:-translate-y-0.5" href={link.href} key={link.href}>
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.12fr_0.88fr] xl:items-start">
         <div className="space-y-5 reveal">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <p className="eyebrow">Live feed</p>
-              <h2 className="mt-2 font-title text-4xl sm:text-5xl">Senaste signaler, misslyckanden och videointag.</h2>
+              <p className="eyebrow">Liveöversikt</p>
+              <h2 className="mt-2 font-title text-4xl sm:text-5xl">Spåren som biter hårdast just nu.</h2>
             </div>
             <p className="text-(--muted) text-sm">Uppdaterad {new Intl.DateTimeFormat("sv-SE", { timeStyle: "short", dateStyle: "medium" }).format(new Date(lastUpdated))}</p>
           </div>
@@ -262,7 +444,7 @@ export function FrontPageLiveClient({
               ["high", "Hög prioritet"],
               ["critical", "Kritiska"],
               ["video", "Video"],
-              ["review", "Under review"],
+              ["review", "Under tryck"],
             ].map(([value, label]) => (
               <button
                 className={feedFilter === value ? "btn-primary" : "btn-secondary"}
@@ -287,7 +469,7 @@ export function FrontPageLiveClient({
           </div>
 
           <div className="space-y-4">
-            {filteredFeed.map((item) => (
+            {featuredFeed.map((item) => (
               <article className="surface rounded-4xl p-5 md:p-6" key={item.id}>
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="space-y-2">
@@ -295,13 +477,13 @@ export function FrontPageLiveClient({
                     <h3 className="font-title text-3xl leading-tight">{item.title}</h3>
                     <p className="text-(--muted) text-sm leading-7">{item.summary}</p>
                   </div>
-                  <span className="tag">{item.severity}</span>
+                  <span className="tag">{severityLabels[item.severity] || item.severity}</span>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2 text-xs">
                   {item.authorityName ? <span className="tag">{item.authorityName}</span> : null}
                   {item.officialName ? <span className="tag">{item.officialName}</span> : null}
                   {item.tags.map((tag) => (
-                    <span className="tag" key={`${item.id}-${tag}`}>{tag}</span>
+                    <span className="tag" key={`${item.id}-${tag}`}>{lifecycleLabels[tag] || severityLabels[tag] || tag}</span>
                   ))}
                 </div>
                 <div className="mt-5 flex flex-wrap gap-3">
@@ -310,62 +492,80 @@ export function FrontPageLiveClient({
                 </div>
               </article>
             ))}
+            {featuredFeed.length === 0 ? (
+              <div className="surface rounded-4xl p-6 text-(--muted) text-sm leading-7">
+                Inga spår matchar de aktiva filtren just nu.
+              </div>
+            ) : null}
+            <div className="flex flex-wrap gap-3">
+              <Link className="btn-secondary" href="/overvakningsspegeln">
+                Öppna frontlinjen
+              </Link>
+              <Link className="btn-secondary" href="/myndighetsgranskaren">
+                Visa hela rapportflödet
+              </Link>
+            </div>
           </div>
         </div>
 
         <aside className="space-y-4 reveal" style={{ animationDelay: "120ms" }}>
           <article className="surface rounded-4xl p-6 md:p-8">
-            <p className="eyebrow">Hot loopholes</p>
+            <p className="eyebrow">Mest omstridda</p>
             <div className="mt-5 space-y-3">
-              {wikiPages.slice(0, 4).map((page) => (
-                <Link className="block rounded-3xl border border-[rgba(22,32,42,0.08)] bg-white/75 p-4 transition hover:-translate-y-0.5" href="/statens-svagheter" key={page.id}>
-                  <h2 className="text-lg font-semibold">{page.title}</h2>
-                  <p className="mt-2 text-(--muted) text-sm leading-7">{page.summary}</p>
+              {confidenceBoard.slice(0, 4).map((entry) => (
+                <Link className="block rounded-3xl border border-[rgba(22,32,42,0.08)] bg-white/75 p-4 transition hover:-translate-y-0.5" href={`/overvakningsspegeln/sok?q=${encodeURIComponent(entry.targetLabel)}`} key={entry.targetId}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-semibold">{entry.targetLabel}</h2>
+                      <p className="mt-1 text-(--muted) text-sm">{entry.kind === "official" ? "Tjänsteroll" : "Myndighetsyta"}</p>
+                    </div>
+                    <span className="tag">{entry.confidenceScore}%</span>
+                  </div>
                 </Link>
               ))}
             </div>
           </article>
 
           <article className="surface rounded-4xl p-6 md:p-8 tone-teal">
-            <p className="eyebrow">Reverse surveillance</p>
+            <p className="eyebrow">Myndigheter att följa</p>
             <div className="mt-5 space-y-3">
-              {videos.slice(0, 2).map((item) => (
-                <div className="rounded-3xl border border-[rgba(22,32,42,0.08)] bg-white/75 p-4" key={item.id}>
-                  <h2 className="text-lg font-semibold">{item.title}</h2>
-                  <p className="mt-2 text-(--muted) text-sm leading-7">{item.riskSummary}</p>
-                </div>
+              {authorities.slice(0, 3).map((authority) => (
+                <Link className="block rounded-3xl border border-[rgba(22,32,42,0.08)] bg-white/75 p-4 transition hover:-translate-y-0.5" href={`/overvakningsspegeln/autoritet#${authority.slug}`} key={authority.id}>
+                  <h2 className="text-lg font-semibold">{authority.name}</h2>
+                  <p className="mt-2 text-(--muted) text-sm leading-7">{authority.summary}</p>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                    <span className="tag">{authority.totalSignals} signaler</span>
+                    <span className="tag">{authority.openAlerts} alerts</span>
+                  </div>
+                </Link>
               ))}
             </div>
-            <Link className="btn-secondary mt-6 w-full" href="/reverse-surveillance">Ladda upp din egen</Link>
+            <Link className="btn-secondary mt-6 w-full" href="/overvakningsspegeln/autoritet">Öppna myndighetskatalogen</Link>
           </article>
 
           <article className="surface-strong rounded-4xl p-6 md:p-8">
-            <p className="eyebrow">Join the resistance</p>
-            <h2 className="mt-2 font-title text-4xl">Skapa konto, bidra med material eller stötta driften.</h2>
-            <p className="mt-3 text-(--muted) text-sm leading-7">
-              Plattformen är redo för Vercel som frontend och Railway som backend. Auth, betalning, AI-worker och offentliga API-endpoints finns redan i koden och väntar bara på produktionsnycklar.
-            </p>
+            <p className="eyebrow">Fördjupa dig</p>
+            <h2 className="mt-2 font-title text-4xl">Wiki, video och nästa lager av material.</h2>
+            <div className="mt-5 space-y-3">
+              {wikiPages.slice(0, 2).map((page) => (
+                <Link className="block rounded-3xl border border-[rgba(22,32,42,0.08)] bg-white/75 p-4 transition hover:-translate-y-0.5" href="/statens-svagheter" key={page.id}>
+                  <h3 className="text-lg font-semibold">{page.title}</h3>
+                  <p className="mt-2 text-(--muted) text-sm leading-7">{page.summary}</p>
+                </Link>
+              ))}
+              {videos.slice(0, 1).map((item) => (
+                <Link className="block rounded-3xl border border-[rgba(22,32,42,0.08)] bg-white/75 p-4 transition hover:-translate-y-0.5" href="/reverse-surveillance" key={item.id}>
+                  <h3 className="text-lg font-semibold">{item.title}</h3>
+                  <p className="mt-2 text-(--muted) text-sm leading-7">{item.riskSummary}</p>
+                </Link>
+              ))}
+            </div>
             <div className="mt-6 grid gap-3">
               <Link className="btn-primary" href="/login">Skapa konto</Link>
-              <Link className="btn-secondary" href="/prissattning">Se planer och stöd</Link>
+              <Link className="btn-secondary" href="/prissattning">Se planer och finansiering</Link>
             </div>
           </article>
         </aside>
-      </section>
-
-      <section className="grid gap-4 lg:grid-cols-3 reveal">
-        {authorities.slice(0, 3).map((authority) => (
-          <Link className="surface rounded-4xl p-6 transition hover:-translate-y-0.5" href={`/overvakningsspegeln/autoritet#${authority.slug}`} key={authority.id}>
-            <p className="eyebrow">{authority.category}</p>
-            <h2 className="mt-2 font-title text-3xl">{authority.name}</h2>
-            <p className="mt-3 text-(--muted) text-sm leading-7">{authority.summary}</p>
-            <div className="mt-4 flex flex-wrap gap-2 text-xs">
-              <span className="tag">{authority.totalSignals} signaler</span>
-              <span className="tag">{authority.publishedReports} rapporter</span>
-              <span className="tag">{authority.openAlerts} alerts</span>
-            </div>
-          </Link>
-        ))}
       </section>
     </div>
   );

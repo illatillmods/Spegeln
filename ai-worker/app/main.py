@@ -20,6 +20,20 @@ app = FastAPI(
 )
 
 
+SUPPORTED_JOBS = [
+    "tax.optimize",
+    "watchdog.triage_case",
+    "watchdog.generate_press_release",
+    "watchdog.reverse_surveillance",
+    "appeals.generate_bundle",
+    "nlp.classify_document",
+    "nlp.extract_entities",
+    "nlp.summarize",
+    "nlp.embed",
+    "nlp.detect_anomalies",
+]
+
+
 class TaxOptimizeRequest(BaseModel):
     income: float = Field(ge=0)
     assets: float = Field(ge=0)
@@ -42,6 +56,14 @@ class TaxOptimizeResponse(BaseModel):
     strategies: list[TaxStrategy]
     disclaimer: str
     premium: bool = True
+
+
+class HealthResponse(BaseModel):
+    status: str = "ok"
+    service: str = "spegeln-ai-worker"
+    provider: str
+    model: str | None = None
+    supportedJobs: list[str]
 
 
 class TextRequest(BaseModel):
@@ -160,7 +182,26 @@ async def maybe_call_model(system_prompt: str, user_payload: dict[str, Any]) -> 
         return json.loads(content)
 
 
-def fallback_tax_strategies(payload: TaxOptimizeRequest) -> TaxOptimizeResponse:
+def get_provider_state() -> tuple[str, str | None]:
+    api_url = os.getenv("AI_PROVIDER_API_URL")
+    api_key = os.getenv("AI_PROVIDER_API_KEY")
+
+    if api_url and api_key:
+        return "model_backed", os.getenv("AI_CHAT_MODEL", "gpt-5-mini")
+
+    return "rules_based", None
+
+
+def build_health_payload() -> HealthResponse:
+    provider_state, model = get_provider_state()
+    return HealthResponse(
+        provider=provider_state,
+        model=model,
+        supportedJobs=SUPPORTED_JOBS,
+    )
+
+
+def build_tax_strategies(payload: TaxOptimizeRequest) -> TaxOptimizeResponse:
     strategies: list[TaxStrategy] = [
         TaxStrategy(
             title="ROT- och RUT-planering",
@@ -207,7 +248,7 @@ def fallback_tax_strategies(payload: TaxOptimizeRequest) -> TaxOptimizeResponse:
     )
 
 
-def fallback_document_classification(text: str) -> dict[str, Any]:
+def classify_document_rules(text: str) -> dict[str, Any]:
     lowered = text.lower()
     labels = []
     if any(keyword in lowered for keyword in ["jo-anmälan", "inspektionen", "anmälan"]):
@@ -221,7 +262,7 @@ def fallback_document_classification(text: str) -> dict[str, Any]:
     return {"labels": labels, "confidence": 0.66}
 
 
-def fallback_entity_extraction(text: str) -> dict[str, Any]:
+def extract_entities_rules(text: str) -> dict[str, Any]:
     emails = re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", text)
     dates = re.findall(r"\b\d{4}-\d{2}-\d{2}\b", text)
     case_numbers = re.findall(r"\b[A-Z]\s?\d{2,6}-\d{2}\b", text)
@@ -234,13 +275,13 @@ def fallback_entity_extraction(text: str) -> dict[str, Any]:
     }
 
 
-def fallback_summary(text: str) -> dict[str, Any]:
+def summarize_text_rules(text: str) -> dict[str, Any]:
     sentences = re.split(r"(?<=[.!?])\s+", text.strip())
     summary = " ".join(sentences[:3]).strip()
     return {"summary": summary[:600], "sentences_used": min(3, len(sentences))}
 
 
-def fallback_embedding(text: str) -> dict[str, Any]:
+def embed_text_rules(text: str) -> dict[str, Any]:
     vector: list[float] = []
     for index in range(32):
         digest = hashlib.sha256(f"{index}:{text}".encode("utf-8")).digest()
@@ -249,7 +290,7 @@ def fallback_embedding(text: str) -> dict[str, Any]:
     return {"embedding": vector, "dimensions": len(vector)}
 
 
-def fallback_anomalies(values: list[float], baseline_label: str) -> dict[str, Any]:
+def detect_anomalies_rules(values: list[float], baseline_label: str) -> dict[str, Any]:
     if len(values) < 2:
         return {"baseline_label": baseline_label, "anomalies": [], "mean": mean(values) if values else 0, "stddev": 0}
 
@@ -267,7 +308,7 @@ def fallback_anomalies(values: list[float], baseline_label: str) -> dict[str, An
     return {"baseline_label": baseline_label, "anomalies": anomalies, "mean": average, "stddev": deviation}
 
 
-def fallback_failure_triage(payload: FailureTriageRequest) -> FailureTriageResponse:
+def triage_failure_rules(payload: FailureTriageRequest) -> FailureTriageResponse:
     evidence_weight = min(20, len(payload.evidence) * 4)
     severity = "CRITICAL" if "våld" in payload.summary.lower() or "övergrepp" in payload.summary.lower() else "HIGH"
     return FailureTriageResponse(
@@ -282,7 +323,7 @@ def fallback_failure_triage(payload: FailureTriageRequest) -> FailureTriageRespo
     )
 
 
-def fallback_press_release(payload: PressReleaseDraftRequest) -> PressReleaseDraftResponse:
+def build_press_release_rules(payload: PressReleaseDraftRequest) -> PressReleaseDraftResponse:
     return PressReleaseDraftResponse(
         headline=payload.title,
         deck="Internt pressutkast för verifierat watchdog-ärende. Får inte publiceras utan moderation och juridisk granskning.",
@@ -294,7 +335,7 @@ def fallback_press_release(payload: PressReleaseDraftRequest) -> PressReleaseDra
     )
 
 
-def fallback_reverse_surveillance(payload: ReverseSurveillanceRequest) -> ReverseSurveillanceResponse:
+def build_reverse_surveillance_rules(payload: ReverseSurveillanceRequest) -> ReverseSurveillanceResponse:
     return ReverseSurveillanceResponse(
         redactionPolicy="Bystanders and sensitive persons are blurred by default. Any decision to reveal identifiable public officials requires manual legal review.",
         riskSummary="Videon måste verifieras, tidsstämplas och granskas för tredjemansrisk innan delning eller publicering.",
@@ -306,7 +347,7 @@ def fallback_reverse_surveillance(payload: ReverseSurveillanceRequest) -> Revers
     )
 
 
-def fallback_appeal_bundle(payload: AutomatedAppealBundleRequest) -> AutomatedAppealBundleResponse:
+def build_appeal_bundle_rules(payload: AutomatedAppealBundleRequest) -> AutomatedAppealBundleResponse:
     return AutomatedAppealBundleResponse(
         parsedDecisionSummary=payload.source_summary,
         riskSummary="Beslutet verkar överklagbart eller kräver kompletterande dokument. Utkasten måste granskas innan inskick.",
@@ -335,9 +376,9 @@ def fallback_appeal_bundle(payload: AutomatedAppealBundleRequest) -> AutomatedAp
     )
 
 
-@app.get("/healthz")
-async def healthz() -> dict[str, str]:
-    return {"status": "ok"}
+@app.get("/healthz", response_model=HealthResponse)
+async def healthz() -> HealthResponse:
+    return build_health_payload()
 
 
 @app.post("/v1/tax/optimize", response_model=TaxOptimizeResponse)
@@ -355,7 +396,7 @@ async def optimize_tax(payload: TaxOptimizeRequest, x_worker_secret: str | None 
     if model_result:
         return TaxOptimizeResponse(**model_result)
 
-    return fallback_tax_strategies(payload)
+    return build_tax_strategies(payload)
 
 
 @app.post("/v1/nlp/classify-document")
@@ -365,7 +406,7 @@ async def classify_document(payload: TextRequest, x_worker_secret: str | None = 
         system_prompt="Classify the public-sector document into a few concise labels. Return JSON with labels and confidence.",
         user_payload=payload.model_dump(),
     )
-    return model_result or fallback_document_classification(payload.text)
+    return model_result or classify_document_rules(payload.text)
 
 
 @app.post("/v1/nlp/extract-entities")
@@ -375,7 +416,7 @@ async def extract_entities(payload: TextRequest, x_worker_secret: str | None = H
         system_prompt="Extract public-sector relevant entities from the text. Return JSON with organizations, dates, case_numbers and emails.",
         user_payload=payload.model_dump(),
     )
-    return model_result or fallback_entity_extraction(payload.text)
+    return model_result or extract_entities_rules(payload.text)
 
 
 @app.post("/v1/nlp/summarize")
@@ -385,19 +426,19 @@ async def summarize(payload: TextRequest, x_worker_secret: str | None = Header(d
         system_prompt="Summarize the text for an investigative editor. Return JSON with summary and key points.",
         user_payload=payload.model_dump(),
     )
-    return model_result or fallback_summary(payload.text)
+    return model_result or summarize_text_rules(payload.text)
 
 
 @app.post("/v1/nlp/embed")
 async def embed(payload: TextRequest, x_worker_secret: str | None = Header(default=None)) -> dict[str, Any]:
     await require_worker_secret(x_worker_secret)
-    return fallback_embedding(payload.text)
+    return embed_text_rules(payload.text)
 
 
 @app.post("/v1/nlp/detect-anomalies")
 async def detect_anomalies(payload: NumericSeriesRequest, x_worker_secret: str | None = Header(default=None)) -> dict[str, Any]:
     await require_worker_secret(x_worker_secret)
-    return fallback_anomalies(payload.values, payload.baseline_label)
+    return detect_anomalies_rules(payload.values, payload.baseline_label)
 
 
 @app.post("/v1/watchdog/triage-case", response_model=FailureTriageResponse)
@@ -412,7 +453,7 @@ async def triage_case(payload: FailureTriageRequest, x_worker_secret: str | None
     )
     if model_result:
         return FailureTriageResponse(**model_result)
-    return fallback_failure_triage(payload)
+    return triage_failure_rules(payload)
 
 
 @app.post("/v1/watchdog/generate-press-release", response_model=PressReleaseDraftResponse)
@@ -427,7 +468,7 @@ async def generate_press_release(payload: PressReleaseDraftRequest, x_worker_sec
     )
     if model_result:
         return PressReleaseDraftResponse(**model_result)
-    return fallback_press_release(payload)
+    return build_press_release_rules(payload)
 
 
 @app.post("/v1/watchdog/reverse-surveillance", response_model=ReverseSurveillanceResponse)
@@ -442,7 +483,7 @@ async def reverse_surveillance(payload: ReverseSurveillanceRequest, x_worker_sec
     )
     if model_result:
         return ReverseSurveillanceResponse(**model_result)
-    return fallback_reverse_surveillance(payload)
+    return build_reverse_surveillance_rules(payload)
 
 
 @app.post("/v1/appeals/generate-bundle", response_model=AutomatedAppealBundleResponse)
@@ -457,4 +498,4 @@ async def generate_appeal_bundle(payload: AutomatedAppealBundleRequest, x_worker
     )
     if model_result:
         return AutomatedAppealBundleResponse(**model_result)
-    return fallback_appeal_bundle(payload)
+    return build_appeal_bundle_rules(payload)

@@ -13,13 +13,12 @@ const severityClasses = {
 };
 
 export function Alerts({ alerts }: AlertsProps) {
-
   return (
     <section className="surface rounded-4xl p-6 md:p-8 reveal">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="eyebrow">Watch alerts</p>
-          <h2 className="mt-2 font-title text-4xl">Nya offentliga poster som kräver uppföljning.</h2>
+          <p className="eyebrow">Offentliga alerts</p>
+          <h2 className="mt-2 font-title text-4xl">Nya verifierade poster som kräver uppföljning.</h2>
         </div>
         <span className="tag">{alerts.length} aktiva alerts</span>
       </div>
@@ -36,7 +35,7 @@ export function Alerts({ alerts }: AlertsProps) {
                 </div>
                 <span className="tag">{alert.severity}</span>
               </div>
-              <p className="mt-3 text-(--muted) text-sm leading-7">Trigger: {alert.trigger}</p>
+              <p className="mt-3 text-(--muted) text-sm leading-7">Utlösare: {alert.trigger}</p>
               <p className="mt-2 text-(--muted) text-xs">{alert.date}</p>
             </article>
           ))

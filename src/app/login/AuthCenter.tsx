@@ -39,11 +39,11 @@ export function AuthCenter({ locale, socialProviders }: AuthCenterProps) {
       setMessage(data.message);
     }
 
-    window.location.href = "/";
+    window.location.href = mode === "register" ? "/konto/onboarding" : "/";
   }
 
   return (
-    <div className="surface-strong rounded-[2rem] p-6 md:p-8">
+    <div className="surface-strong rounded-4xl p-6 md:p-8">
       <div className="flex flex-wrap gap-3">
         <button className={mode === "login" ? "btn-primary" : "btn-secondary"} onClick={() => setMode("login")} type="button">
           {locale === "en" ? "Email sign in" : "E-postinloggning"}
@@ -86,8 +86,8 @@ export function AuthCenter({ locale, socialProviders }: AuthCenterProps) {
             <input checked={marketingConsent} onChange={(event) => setMarketingConsent(event.target.checked)} type="checkbox" />
             <span>
               {locale === "en"
-                ? "I want product updates and launch notes. Legal notices and security messages are always sent when necessary."
-                : "Jag vill få produktuppdateringar och lanseringsnotiser. Juridiska besked och säkerhetsmeddelanden skickas alltid vid behov."}
+                ? "I want product drops, launch notes, and new tools. Operational alerts and account messages are always sent when needed."
+                : "Jag vill få produktsläpp, lanseringsnotiser och nya verktyg. Driftlarm och kontomeddelanden skickas alltid när det behövs."}
             </span>
           </label>
         ) : null}
@@ -130,8 +130,8 @@ export function AuthCenter({ locale, socialProviders }: AuthCenterProps) {
       <div className="mt-6 grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
         <p className="text-(--muted) text-sm leading-7">
           {locale === "en"
-            ? "Need a low-friction start? You can enter with an anonymous guest session and upgrade later."
-            : "Behöver du en lågfriktionsstart? Du kan gå in med en anonym gästsession och uppgradera senare."}
+            ? "Need the fastest way in? Start anonymously and upgrade later."
+            : "Behöver du snabbaste vägen in? Starta anonymt och uppgradera senare."}
         </p>
         <button
           className="btn-secondary"

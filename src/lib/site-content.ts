@@ -63,31 +63,31 @@ export type PricingPlan = {
 export const heroMetrics: Metric[] = [
   {
     value: "24/7",
-    label: "bevakning av öppna källor",
-    detail: "Automatiska signaler från diarier, upphandlingar, domstolar och medier.",
+    label: "signaljakt mot makten",
+    detail: "Automatiska larm från diarier, upphandlingar, domstolar och allt systemet helst gör svårnavigerat.",
   },
   {
-    value: "4x",
-    label: "intäktsströmmar i samma produkt",
-    detail: "Freemium, abonnemang, usage-priser och strikt etiska annonsytor.",
+    value: "4",
+    label: "fronter i samma plattform",
+    detail: "Utforska, slå tillbaka, publicera och organisera tryck från samma kontrollrum.",
   },
   {
-    value: "GDPR+",
-    label: "juridiska kontrollpunkter",
-    detail: "Manuell granskning före publicering och dokumenterad dataminimering.",
+    value: "0%",
+    label: "neutral kuliss",
+    detail: "Spegeln är byggd för att provocera fram mer insyn, inte för att tala myndighetsspråk.",
   },
 ];
 
 export const productModules: ModuleCard[] = [
   {
     eyebrow: "Aktivering",
-    title: "Byråkrati-bombaren för samordnade krav",
+    title: "Byråkrati-bombaren för samordnat mottryck",
     description:
-      "Skapa JO-anmälningar, GDPR-begäranden, informationskrav och formella klagomål i batch med mallar, mottagarförslag och statusspårning.",
+      "Skapa JO-anmälningar, registerkrav, informationskrav och klagomål i batch när myndigheter kör fast, drar ut på tiden eller gömmer sig bakom processer.",
     bullets: [
-      "Genererar myndighetsanpassade dokument från ett enda underlag.",
-      "Väljer relevanta myndigheter och registratorer per ärendetyp och region.",
-      "Loggar spårningskoder, prisestimat och abuse-skydd innan utskick.",
+      "Genererar mottagaranpassade dokument från ett enda underlag.",
+      "Väljer relevanta myndigheter, tillsynsaktörer och registratorer per ärendetyp och region.",
+      "Ger spårningskoder, prisestimat och tydligt tempotak innan utskick.",
     ],
     tone: "amber",
   },
@@ -105,25 +105,25 @@ export const productModules: ModuleCard[] = [
   },
   {
     eyebrow: "Publicering",
-    title: "Rapportmotor med juridisk grind",
+    title: "Rapportmotor utan silkesvantar",
     description:
-      "AI hjälper till att sammanställa material, men publicering sker först efter faktakontroll, spårbar källkedja och juridiskt godkännande.",
+      "AI hjälper till att bygga underlag, men poängen är att snabbt få fram mönster, sammanhang och pressbara berättelser om hur makten fungerar.",
     bullets: [
-      "Tydlig status för utkast, faktakoll, juridisk kö och publicering.",
-      "Källspårning per påstående för redaktion och jurist.",
-      "Rättelseflöde och loggning för efterhandsgranskning.",
+      "Tydlig status för råspår, korskoppling, publiceringsspår och vidare tryck.",
+      "Källspårning per påstående för den som vill pressa vidare ett ärende.",
+      "Öppna rapporter, uppföljningar och återkommande påminnelser om att frågan inte är död.",
     ],
     tone: "ink",
   },
   {
     eyebrow: "Deltagande",
-    title: "Publik insyn utan att tappa kontrollen",
+    title: "Publik insyn med öppet tryck",
     description:
-      "Ta emot tips, låt allmänheten följa ärenden och bygg förtroende genom tydliga roller, moderation och ansvarsfördelning.",
+      "Ta emot tips, låt allmänheten följa ärenden och bygg kraft genom publik respons, synliga roller och återkommande konfrontation med makten.",
     bullets: [
-      "Tipsformulär med samtycke, moderering och eskaleringsregler.",
-      "Publika rapporter och öppna uppföljningssidor per myndighet.",
-      "Roller för redaktion, jurist, analytiker och administratör.",
+      "Tipsformulär för människor som redan vet att något skaver.",
+      "Publika rapporter och öppna uppföljningssidor per myndighet och spår.",
+      "Roller för analytiker, publicister, kampanjbyggare och administratörer.",
     ],
     tone: "amber",
   },
@@ -133,36 +133,36 @@ export const stackChoices: StackChoice[] = [
   {
     title: "Next.js 16, React 19 och TypeScript",
     description:
-      "En fullstack-webbapp med App Router, server rendering och ett enda deploybart gränssnitt för publik webb och interna arbetsytor.",
+      "En fullstack-webbapp med App Router, server rendering och ett enda deploybart gränssnitt för publik press, dokumentspår och interna arbetsytor.",
     rationale:
-      "Snabb utveckling, stark DX och färre rörliga delar än att separera React-frontend och Express-API i MVP-fasen.",
+      "Snabb utveckling väger tyngre än perfekt arkitektur när målet är att jaga systemfel fort och få ut funktionerna i händerna på användarna.",
     status: "Implementerat i denna repo",
     tone: "teal",
   },
   {
     title: "PostgreSQL och Prisma",
     description:
-      "Relationsdata för bevakningar, rapporter, juridiska beslut, användare, betalning och audit-loggar.",
+      "Relationsdata för bevakningar, rapporter, beslutsspår, användare, betalning och revisionsbara händelser.",
     rationale:
-      "PostgreSQL ger robust ACID-modell och Prisma ger snabb iteration med tydlig schemahistorik.",
+      "PostgreSQL ger en robust modell för spårkedjor och Prisma gör det snabbt att ändra strukturen när nya svagheter i systemet upptäcks.",
     status: "Implementerat i denna repo",
     tone: "ink",
   },
   {
     title: "Python/FastAPI för AI- och NLP-jobb",
     description:
-      "Separat worker för dokumentklassning, entity extraction, embeddings, avvikelser och sammanfattningar.",
+      "Separat worker för dokumentklassning, entity extraction, embeddings, avvikelser och sammanfattningar som vässar nästa drag.",
     rationale:
-      "Python-ekosystemet är fortfarande bäst för textanalys, batchjobb och modellexperimentering.",
-    status: "Påbörjat i denna repo",
+      "Python-ekosystemet är fortfarande snabbast när textmassor ska tolkas, korskopplas och pressas till användbara mönster.",
+    status: "Implementerat i denna repo",
     tone: "amber",
   },
   {
     title: "Vercel för webb, Railway för data och jobb",
     description:
-      "Vercel driver Next.js-gränssnittet och API-routes, medan Railway passar bra för PostgreSQL nu och separata workers eller cronjobb senare.",
+      "Vercel driver gränssnittet och proxar API-trafiken, medan Railway kör den separata backendtjänsten, databasen och jobb som måste leva nära datan.",
     rationale:
-      "Det här matchar en hosted-first arbetsmodell, minskar lokal drift och ligger nära hur många svenska produktteam redan kör små och medelstora SaaS-projekt.",
+      "Hosted-first minskar onödig driftfriktion så att mer energi går till att bygga spår, inte att sköta servrar.",
     status: "Implementerat i denna repo",
     tone: "teal",
   },
@@ -170,22 +170,22 @@ export const stackChoices: StackChoice[] = [
 
 export const monetizationChannels: MonetizationChannel[] = [
   {
-    title: "Freemium för publik räckvidd",
+    title: "Fri tillgång för brett tryck",
     summary:
-      "Gratisnivån öppnar rapporter, ett mindre antal bevakningar och ett tryggt sätt att lämna tips.",
+      "Gratisnivån öppnar rapporter, grundbevakningar och ett öppet inflöde av tips.",
     details: [
       "Gratis konto med begränsad historik och veckosammanfattningar.",
-      "Driver användartillväxt, trovärdighet och tipsflöde utan hård betalvägg.",
+      "Ingen betalvägg framför det som behövs för att se mönster, följa makten och börja ställa frågor.",
     ],
     tone: "teal",
   },
   {
-    title: "Premiumabonnemang för arbetsflöde",
+    title: "Premium för fart och tyngre verktyg",
     summary:
-      "Betalda planer låser upp fler bevakningar, realtidsnotiser, teamfunktioner och juridisk arbetskö.",
+      "Betalda planer låser upp fler bevakningar, snabbare larm, teamytor och tyngre analysmotorer.",
     details: [
-      "Rimlig prissättning för journalister, organisationer och mindre redaktioner.",
-      "Återkommande intäkter finansierar datakvalitet, moderation och säker drift.",
+      "Prissatt för journalister, aktivister, organisationer och små grävlag.",
+      "Återkommande intäkter finansierar fler källor, tätare crawlning och hårdare press mot systemen.",
     ],
     tone: "ink",
   },
@@ -200,12 +200,12 @@ export const monetizationChannels: MonetizationChannel[] = [
     tone: "amber",
   },
   {
-    title: "Etiska annonser med hård policy",
+    title: "Allierade sponsorer, inte putsad fasad",
     summary:
-      "Sponsrade placeringar kan fungera, men endast om de är tydligt märkta och hålls långt från känsliga dataflöden.",
+      "Sponsrade ytor kan fungera när de tydligt pekar mot verktyg som hjälper folk att rota, arkivera, kryptera och publicera.",
     details: [
-      "Tillåt endast juridik, integritet, visselblåsarverktyg och närliggande samhällsnyttiga tjänster.",
-      "Ingen profilering på känsliga personuppgifter eller pågående ärenden.",
+      "Sponsorer ska stärka användarens mottryck, inte tona ned sajtens konflikt med makten.",
+      "Ingen sponsor får styra vilka myndighetsspår som följs eller vilka dokument som lyfts.",
     ],
     tone: "teal",
   },
@@ -213,46 +213,46 @@ export const monetizationChannels: MonetizationChannel[] = [
 
 export const legalPillars: LegalPillar[] = [
   {
-    title: "Rättslig grund och ändamålsbegränsning",
+    title: "Maximal insyn i beslutsmaskinen",
     description:
-      "Varje datakategori behöver dokumenterad rättslig grund, tydligt ändamål och separata retention-regler.",
+      "Följ diarier, register, upphandlingar och relationer tills beslutsmaskinen slutar låtsas vara ogenomskinlig.",
     points: [
-      "Kartlägg vilken behandling som vilar på berättigat intresse, avtal eller allmänt intresse.",
-      "Särskilj research, publicering och användarkonton i registerförteckningen.",
-      "Undvik sekundär användning av data utan ny prövning av laglig grund.",
+      "Knyt personer, myndigheter, leverantörer och beslut till samma öppna spårkedja.",
+      "Bygg profiler som visar hur offentliga roller, pengar och dokument faktiskt hänger ihop.",
+      "Låt användaren gå från en signal till ett mönster utan att fastna i myndighetens egen berättelse.",
     ],
     tone: "ink",
   },
   {
-    title: "Dataminimering och gallring",
+    title: "Källkedjor som biter tillbaka",
     description:
-      "Systemet ska samla in minsta möjliga mängd personuppgifter och ha inbyggda regler för radering, maskning och arkivering.",
+      "Varje spår ska kunna pressas vidare till dokument, relation, tidslinje eller offentlig handling som går att visa upp.",
     points: [
-      "Maska kontaktuppgifter och fritext tidigt i pipeline när de inte behövs.",
-      "Sätt tidsgränser för rådata, tipsutkast och juridiskt blockerade ärenden.",
-      "Förbered rutiner för registerutdrag, rättelse och radering där det är tillämpligt.",
+      "Gör källfamiljer tydliga så att användaren vet var trycket kan läggas härnäst.",
+      "Korskoppla öppna poster så att myndighetens språkliga dimridåer blir svårare att gömma sig bakom.",
+      "Låt rådata, sammanfattningar och färdiga rapporter leva sida vid sida när det stärker berättelsen.",
     ],
     tone: "teal",
   },
   {
-    title: "Mänsklig granskning före publicering",
+    title: "Publikt tryck i stället för neutral ton",
     description:
-      "Automatiserad klassning får aldrig ensamt skapa offentliga anklagelser eller riskbedömningar om enskilda personer.",
+      "Spegeln är byggd för att trigga frågor, blåsa liv i vittnesmål och göra institutionell bekvämlighet dyrare.",
     points: [
-      "Kräv redaktionell och juridisk godkännandekedja för publicering.",
-      "Logga vilka källor som stöder varje påstående.",
-      "Skapa rutiner för genmäle, rättelse och överklagande av publicerat innehåll.",
+      "Publicera inte som ett passivt arkiv, utan som en plattform som håller trycket uppe över tid.",
+      "Låt rapporter, wiki, video och scorecards peka in i varandra i stället för att leva isolerat.",
+      "Skriv så att makten måste svara, inte så att den kan luta sig tillbaka.",
     ],
     tone: "amber",
   },
   {
-    title: "GDPR, sekretess och förtalsrisk",
+    title: "Gemensam moteld",
     description:
-      "Produkten måste bedöma offentlighetsprincipen tillsammans med GDPR, sekretesslagstiftning och regler kring ansvarig publicering.",
+      "När någon hittar ett mönster ska andra kunna förstärka det med tips, vittnesmål, batcher och export.",
     points: [
-      "Genomför DPIA för tipsflöde, AI-klassning och högvolymsmonitorering.",
-      "Inför spärr mot publicering av särskilt skyddsvärda uppgifter.",
-      "Låt svensk jurist granska namnpublicering, sammanställningar och ansvarsfördelning före lansering.",
+      "Folkets domstol, Myndighetsgranskaren och Reverse Surveillance ska kännas som delar av samma upptrappning.",
+      "Gör det lätt att gå från enskilt vittnesmål till gemensam berättelse och vidare till samordnat utskick.",
+      "Bygg communityytor som förstärker kritik mot myndigheter i stället för att neutralisera den.",
     ],
     tone: "ink",
   },
@@ -260,24 +260,24 @@ export const legalPillars: LegalPillar[] = [
 
 export const workflowSteps: WorkflowStep[] = [
   {
-    title: "Insamling",
-    description: "Systemet hämtar enbart definierade öppna källor och tidsstämplar varje signal.",
+    title: "Fånga spår",
+    description: "Systemet drar in öppna källor, tips och bilagor där makten lämnar avtryck.",
   },
   {
-    title: "Klassning",
-    description: "Regler och AI markerar avvikelser, ämnen, geografier och möjlig relevans.",
+    title: "Korskoppla",
+    description: "Regler och AI markerar mönster, relationer, upprepningar och svaga punkter som är värda att följa.",
   },
   {
-    title: "Redaktionell kontroll",
-    description: "En människa validerar källor, sammanhang och om signalen är publiceringsbar.",
+    title: "Vässa berättelsen",
+    description: "Underlaget förvandlas till profiler, rapportspår, scorecards och batchredo material.",
   },
   {
-    title: "Juridisk granskning",
-    description: "Jurist eller ansvarig granskare bedömer risk, proportionalitet och personuppgifter.",
+    title: "Släpp trycket",
+    description: "Materialet går ut som rapport, wiki, vittnesmål eller samordnat utskick mot rätt mottagare.",
   },
   {
-    title: "Publicering och dialog",
-    description: "Rapport publiceras med rättelseflöde, loggning och modererad publik respons.",
+    title: "Håll elden vid liv",
+    description: "Publiken följer, röstar, skickar nytt material och pressar vidare tills frågan inte går att ignorera.",
   },
 ];
 
@@ -285,39 +285,39 @@ export const dashboardSignals: DashboardSignal[] = [
   {
     authority: "Inspektionen för vård och omsorg",
     region: "Nationell bevakning",
-    severity: "Hög prioritet",
+    severity: "Maxtryck",
     summary:
-      "Tre nya öppna signaler tyder på ett mönster i upphandling och tillsyn som bör granskas tillsammans.",
+      "Tre nya öppna spår pekar mot ett mönster i upphandling och tillsyn som tål att blåsas upp offentligt.",
     items: [
       "1 nytt domstolsdokument länkat till tidigare ärende.",
       "2 medieträffar med samma leverantörskedja.",
-      "Status: kräver juridisk kontroll före publicering.",
+      "Status: redo att pressas vidare i rapportflödet.",
     ],
     tone: "teal",
   },
   {
     authority: "Länsstyrelsen Stockholm",
     region: "Region Stockholm",
-    severity: "Mellanprioritet",
+    severity: "Trycket ökar",
     summary:
-      "Förändrat beslutsmönster i ett offentligt diarieförlopp kan motivera en förklarande rapport.",
+      "Förändrat beslutsmönster i ett offentligt diarieförlopp kan bli en rapport som tvingar fram svar.",
     items: [
       "Nytt diariedokument upptäckt i nattlig körning.",
       "Tidsserie visar snabbare handläggning än historiskt spann.",
-      "Status: redo för redaktionell sammanfattning.",
+      "Status: redo för sammanfattning och vidare spridning.",
     ],
     tone: "ink",
   },
   {
     authority: "Trafikverket",
     region: "Västra Götaland",
-    severity: "Juridisk kö",
+    severity: "Skarpt läge",
     summary:
-      "Ett publikinskickat tips stödjs delvis av öppna källor men kräver extra försiktighet runt personuppgifter.",
+      "Ett publikinskickat tips har öppnat fler dörrar än myndigheten lär gilla och pekar mot ett större mönster.",
     items: [
-      "Tipset har samtycke men innehåller känslig fritext.",
-      "Maskning behövs innan något delas med redaktion.",
-      "Status: blockerad tills gallringsregler har tillämpats.",
+      "Tipset bärs upp av flera öppna referenser.",
+      "Ny batch eller fördjupad profil kan bli nästa drag.",
+      "Status: användarna trycker redan på för uppföljning.",
     ],
     tone: "amber",
   },
@@ -329,12 +329,12 @@ export const pricingPlans: PricingPlan[] = [
     price: "0 kr",
     audience: "Privatpersoner och nyfikna väljare",
     description:
-      "Basnivån för publik räckvidd, transparens och trygg tipsinlämning utan att skapa betalvägg kring samhällsnyttig information.",
+      "Basnivån för rapporter, grundbevakning och öppet inflöde utan att sätta betalvägg framför den fria insynen.",
     bullets: [
       "3 aktiva bevakningar",
       "Veckosammanfattningar",
       "Tillgång till publika rapporter",
-      "Tipsflöde med samtycke och moderation",
+      "Öppet tipsflöde och publik respons",
     ],
     tone: "teal",
   },
@@ -343,7 +343,7 @@ export const pricingPlans: PricingPlan[] = [
     price: "249 kr/mån",
     audience: "Journalister, aktivister och små team",
     description:
-      "Mer fart i arbetsflödet med fler bevakningar, tätare notiser och export av öppna datautdrag.",
+      "Mer fart i arbetsflödet med fler bevakningar, tätare notiser och export av öppna datautdrag som går att bygga vidare på.",
     bullets: [
       "20 aktiva bevakningar",
       "Dagliga eller timvisa varningar",
@@ -358,13 +358,13 @@ export const pricingPlans: PricingPlan[] = [
     price: "990 kr/mån",
     audience: "Redaktioner, organisationer och rådgivare",
     description:
-      "Den operativa planen för team som behöver rollstyrning, revisionsspår och tydlig juridisk arbetskö.",
+      "Planen för team som vill ha högre tempo, gemensamma arbetsytor och full tryckkapacitet i samma system.",
     bullets: [
       "Obegränsade bevakningar",
       "Rollbaserad åtkomst",
-      "Juridisk granskningskö",
-      "Prioriterade SLA:er och revisionsloggar",
-      "Obegränsade batcher i Byråkrati-bombaren inom abuse-gränser",
+      "Gemensam kampanjyta",
+      "Prioriterade pushar och revisionsloggar",
+      "Obegränsade batcher i Byråkrati-bombaren inom tempogränser",
     ],
     highlight: true,
     tone: "amber",
@@ -387,24 +387,24 @@ export const pricingPlans: PricingPlan[] = [
 ];
 
 export const governancePrinciples: string[] = [
-  "Inga offentliga påståenden publiceras automatiskt utan mänsklig kontroll.",
-  "Varje publicerad slutsats ska kunna spåras till källor och ansvarig granskare.",
-  "Särskilt känsliga personuppgifter ska blockeras eller maskas innan de når publik yta.",
-  "Det måste finnas rutin för genmäle, rättelse och borttagning när det är motiverat.",
+  "Spegeln finns för att störa mörkläggning, inte för att ge makten ett bekvämare språk.",
+  "Varje publikt påstående ska kunna tryckas tillbaka till dokument, tidslinjer eller öppna källor.",
+  "När ett mönster spricker upp ska communityn kunna förstärka det med vittnesmål, export och vidare spår.",
+  "Spegeln väljer sida: mer ljus, mindre myndighetsro.",
 ];
 
 export const ethicalAdRules: string[] = [
-  "Alla annonser ska märkas tydligt och hållas separerade från rapporter, tips och juridiska beslut.",
-  "Ingen målgruppsstyrning får bygga på känsliga personuppgifter, politiska åsikter eller pågående ärenden.",
-  "Tillåtna annonsörer bör begränsas till juridik, integritet, informationssäkerhet och visselblåsarrelaterade tjänster.",
-  "Annonsörer ska granskas manuellt och kunna stängas av om de riskerar att skada plattformens trovärdighet.",
+  "Sponsrade ytor ska vara öppna med att de är sponsrade och aldrig låtsas vara redaktionellt material.",
+  "Sponsorer ska hjälpa användare att gräva, arkivera, kryptera, organisera eller publicera.",
+  "Ingen sponsor får styra vilka myndighetsspår som följs eller vilka dokument som lyfts.",
+  "Om en sponsor försöker putsa makten kastas den ut.",
 ];
 
 export const launchChecklist: string[] = [
-  "Låt svensk jurist granska rättslig grund, publiceringsansvar och namnpubliceringspolicy.",
-  "Genomför DPIA för AI-klassning, tipsflöde och större personuppgiftsbehandling.",
-  "Dokumentera gallringsregler, datakällor och incidentprocesser i ett internt kontrollpaket.",
-  "Säkerställ biträdesavtal, loggning och incidentrapportering för driftmiljön.",
-  "Bygg rate limiting, abuse-skydd och manuell moderation innan öppet tipsflöde aktiveras brett.",
-  "Verifiera att export, annonser och analysfunktioner inte kringgår sekretess- eller proportionalitetsbedömningar.",
+  "Öppna fler källspår mot kommuner, domstolar och bolag runt myndigheterna.",
+  "Skruva upp batchkapaciteten för samordnade kampanjer och uppföljningar.",
+  "Gör export, API och scorecards råare så att fler kan bygga eget tryck ovanpå datan.",
+  "Ge communityn bättre verktyg för vittnesmål, revisioner och upptrappning.",
+  "Lägg på fler realtidslarm och tydligare myndighetsprofiler i upptäcktsläget.",
+  "Fortsätt kapa friktion mellan första spår, första publicering och första batch.",
 ];

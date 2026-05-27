@@ -1,22 +1,25 @@
 import type { Metadata } from "next";
-import { listAuthorityFailureReports } from "@/lib/civic-features";
+import type { FailureReportView } from "@/lib/civic-features";
+import { ModuleHero } from "@/components/ui/ModuleHero";
+import { serverApiJson } from "@/lib/server-api";
 import { AuthorityFailuresClient } from "./Client";
 
 export const metadata: Metadata = {
   title: "Myndighetsgranskaren",
-  description: "Anonym rapportering, AI-triagering, pressutkast och moderation för myndighetsfel och skandaler.",
+  description: "Anonym rapportering, AI-triage och pressbara spår för myndighetsfel och skandaler.",
 };
 
 export default async function AuthorityFailuresPage() {
-  const initialItems = await listAuthorityFailureReports();
+  const response = await serverApiJson<{ items: FailureReportView[] }>("/api/myndighetsgranskaren/reports");
+  const initialItems = response.items;
 
   return (
     <div className="shell space-y-10 pb-20 pt-10 md:pt-14">
-      <section className="space-y-5 reveal">
-        <p className="eyebrow">Myndighetsgranskaren</p>
-        <h1 className="max-w-4xl font-title text-5xl leading-none sm:text-6xl">Anonym bevisinhämtning med AI-prioritering, moderering och juridisk grind.</h1>
-        <p className="max-w-3xl text-(--muted) text-lg leading-8">Varje ärende får AI-triage, pressutkast och ett obligatoriskt modererings- och legal review-flöde före eventuell publicering.</p>
-      </section>
+      <ModuleHero
+        description="Varje ärende får AI-triage, pressbara sammanfattningar och en tydlig väg vidare till feed, profil eller batch när systemet behöver svara."
+        eyebrow="Myndighetsgranskaren"
+        title="Anonym bevisinhämtning som sätter maktmissbruk under tryck."
+      />
       <AuthorityFailuresClient initialItems={initialItems} />
     </div>
   );

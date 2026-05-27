@@ -59,117 +59,6 @@ export type PublicDatasetFilters = {
 const DEFAULT_COUNTRY = "SE";
 const SCORECARD_METHOD_VERSION = "watchdog-v1";
 
-const mockLeaderboard: Record<LeaderboardWindowKey, LeaderboardEntry[]> = {
-  weekly: [
-    { rank: 1, alias: "Medborgare-ALFA", score: 41, complaintsWithResponse: 2, investigationsReported: 1, peerEndorsements: 5, upvotes: 3 },
-    { rank: 2, alias: "Insyn-BJORK", score: 36, complaintsWithResponse: 1, investigationsReported: 1, peerEndorsements: 4, upvotes: 3 },
-    { rank: 3, alias: "Granskare-NORD", score: 28, complaintsWithResponse: 2, investigationsReported: 0, peerEndorsements: 2, upvotes: 3 },
-  ],
-  monthly: [
-    { rank: 1, alias: "Medborgare-ALFA", score: 84, complaintsWithResponse: 4, investigationsReported: 3, peerEndorsements: 8, upvotes: 7 },
-    { rank: 2, alias: "Insyn-BJORK", score: 63, complaintsWithResponse: 3, investigationsReported: 2, peerEndorsements: 5, upvotes: 4 },
-    { rank: 3, alias: "Granskare-NORD", score: 49, complaintsWithResponse: 3, investigationsReported: 1, peerEndorsements: 4, upvotes: 5 },
-  ],
-  "all-time": [
-    { rank: 1, alias: "Medborgare-ALFA", score: 142, complaintsWithResponse: 8, investigationsReported: 5, peerEndorsements: 13, upvotes: 14 },
-    { rank: 2, alias: "Insyn-BJORK", score: 119, complaintsWithResponse: 6, investigationsReported: 4, peerEndorsements: 11, upvotes: 9 },
-    { rank: 3, alias: "Granskare-NORD", score: 93, complaintsWithResponse: 5, investigationsReported: 3, peerEndorsements: 8, upvotes: 10 },
-  ],
-};
-
-const mockDashboard: DashboardItem[] = [
-  {
-    authorityId: "demo-polisen",
-    authorityName: "Polismyndigheten",
-    slug: "polismyndigheten",
-    category: "POLICE",
-    regionCode: "SE-AB",
-    countryCode: "SE",
-    complaints: 18,
-    investigations: 6,
-    reports: 4,
-    attentionScore: 86,
-    resolutionRate: 0.44,
-  },
-  {
-    authorityId: "demo-fk",
-    authorityName: "Försäkringskassan",
-    slug: "forsakringskassan",
-    category: "AGENCY",
-    regionCode: "SE-AB",
-    countryCode: "SE",
-    complaints: 14,
-    investigations: 3,
-    reports: 2,
-    attentionScore: 58,
-    resolutionRate: 0.57,
-  },
-  {
-    authorityId: "demo-stockholm",
-    authorityName: "Stockholms stad",
-    slug: "stockholms-stad",
-    category: "MUNICIPALITY",
-    regionCode: "SE-AB",
-    countryCode: "SE",
-    complaints: 11,
-    investigations: 4,
-    reports: 3,
-    attentionScore: 55,
-    resolutionRate: 0.62,
-  },
-];
-
-const mockScorecards: AuthorityScorecardView[] = [
-  {
-    authorityId: "demo-polisen",
-    authorityName: "Polismyndigheten",
-    slug: "polismyndigheten",
-    category: "POLICE",
-    regionCode: "SE-AB",
-    countryCode: "SE",
-    overallScore: 52,
-    transparencyScore: 49,
-    responseTimeScore: 57,
-    complaintsScore: 44,
-    resolutionScore: 58,
-    methodologyVersion: SCORECARD_METHOD_VERSION,
-    explanation: {
-      inputs: { complaints: 18, responded: 9, resolved: 8, publishedReports: 4, avgResponseHours: 118 },
-      formulas: [
-        "transparency = 35 + min(30, publicReports * 8) + min(35, respondedComplaints * 3)",
-        "response = 100 - round(avgResponseHours / 10)",
-        "complaints = 100 - min(70, complaints * 3)",
-        "resolution = round((resolved / complaints) * 100)",
-      ],
-      note: "Transparens använder en reproducerbar proxy tills plattformen har ett separat dataset för offentlighetsförfrågningar och rådataöppenhet.",
-    },
-  },
-  {
-    authorityId: "demo-fk",
-    authorityName: "Försäkringskassan",
-    slug: "forsakringskassan",
-    category: "AGENCY",
-    regionCode: "SE-AB",
-    countryCode: "SE",
-    overallScore: 61,
-    transparencyScore: 58,
-    responseTimeScore: 63,
-    complaintsScore: 58,
-    resolutionScore: 65,
-    methodologyVersion: SCORECARD_METHOD_VERSION,
-    explanation: {
-      inputs: { complaints: 14, responded: 10, resolved: 8, publishedReports: 2, avgResponseHours: 93 },
-      formulas: [
-        "transparency = 35 + min(30, publicReports * 8) + min(35, respondedComplaints * 3)",
-        "response = 100 - round(avgResponseHours / 10)",
-        "complaints = 100 - min(70, complaints * 3)",
-        "resolution = round((resolved / complaints) * 100)",
-      ],
-      note: "Metoden är avsiktligt enkel och fullt reproducerbar från de anonymiserade aggregerade händelserna.",
-    },
-  },
-];
-
 function normalizeWindow(windowValue?: string | null): LeaderboardWindowKey {
   if (windowValue === "monthly" || windowValue === "all-time") {
     return windowValue;
@@ -308,7 +197,7 @@ export async function getLeaderboard(windowValue?: string, countryCode = DEFAULT
 async function getLeaderboardInternal(windowKey: LeaderboardWindowKey, countryCode: string) {
   const prisma = getPrismaClient();
   if (!prisma) {
-    return mockLeaderboard[windowKey];
+    return [];
   }
 
   const { start, end } = getWindowBounds(windowKey);
@@ -500,7 +389,7 @@ export async function getDashboardSnapshot(filters: PublicDatasetFilters = {}) {
 async function getDashboardSnapshotInternal(filters: Required<PublicDatasetFilters>) {
   const prisma = getPrismaClient();
   if (!prisma) {
-    return mockDashboard;
+    return [];
   }
 
   const authorityWhere: Prisma.AuthorityWhereInput = {
@@ -622,7 +511,7 @@ export async function getAuthorityScorecards(filters: PublicDatasetFilters = {})
 async function getAuthorityScorecardsInternal(filters: Required<PublicDatasetFilters>) {
   const prisma = getPrismaClient();
   if (!prisma) {
-    return mockScorecards;
+    return [];
   }
 
   const authorityWhere: Prisma.AuthorityWhereInput = {

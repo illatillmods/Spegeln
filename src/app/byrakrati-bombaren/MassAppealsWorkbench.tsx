@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { EntityPicker, type EntityOption } from "@/components/ui/EntityPicker";
 import type {
   AppealType,
   AuthorityTarget,
@@ -70,6 +71,7 @@ export function MassAppealsWorkbench({ catalog }: { catalog: MassAppealCatalog }
   const [error, setError] = useState<string | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [loadingSend, setLoadingSend] = useState(false);
+  const [authoritySearch, setAuthoritySearch] = useState<EntityOption | null>(null);
 
   const recommendedAuthorities = getRecommendedAuthorities(catalog.authorities, form.appealType, form.region);
 
@@ -180,22 +182,22 @@ export function MassAppealsWorkbench({ catalog }: { catalog: MassAppealCatalog }
         <div className="space-y-5 reveal">
           <p className="eyebrow">Byråkrati-bombaren</p>
           <h1 className="max-w-4xl font-title text-5xl leading-none sm:text-6xl">
-            Bygg, skicka och följ upp JO-anmälningar, GDPR-begäranden och informationskrav i en enda batch.
+            Bygg, skicka och följ upp JO-anmälningar, registerkrav och informationskrav i en enda batch.
           </h1>
           <p className="max-w-3xl text-(--muted) text-lg leading-8">
-            Välj ärendetyp, skriv ett underlag en gång och låt Spegeln generera mottagaranpassade dokument med spårningskod, prisestimat och abuse-skydd inbyggt från start.
+            Välj ärendetyp, skriv ett underlag en gång och låt Spegeln generera mottagaranpassade dokument med spårningskod, prisestimat och tydliga tempotak från start.
           </p>
           <div className="flex flex-wrap gap-2 text-(--muted) text-sm">
             <span className="tag">Autogenererade mallar</span>
             <span className="tag">Bulk-sändning till relevanta myndigheter</span>
             <span className="tag">Statusspårning per mottagare</span>
-            <span className="tag">Rate limiting och spärrar</span>
+            <span className="tag">Tempogränser i MVP:n</span>
           </div>
         </div>
 
         <article className="surface-strong rounded-4xl p-6 md:p-8 reveal" style={{ animationDelay: "120ms" }}>
-          <p className="eyebrow">Ekonomi och spärrar</p>
-          <h2 className="mt-3 font-title text-4xl">Usage när det passar, obegränsat när arbetsflödet kräver det.</h2>
+          <p className="eyebrow">Tempo och prissättning</p>
+          <h2 className="mt-3 font-title text-4xl">Usage när det passar, full kraft när arbetsflödet kräver det.</h2>
           <div className="mt-6 space-y-4">
             {catalog.billingModels.map((model) => (
               <div className="rounded-3xl border border-[rgba(22,32,42,0.08)] bg-white/70 p-5" key={model.id}>
@@ -273,14 +275,14 @@ export function MassAppealsWorkbench({ catalog }: { catalog: MassAppealCatalog }
             </label>
             <label className="space-y-2">
               <span className="eyebrow">Bakgrund</span>
-              <textarea className="input min-h-40" value={form.incidentSummary} onChange={(event) => updateField("incidentSummary", event.target.value)} placeholder="Beskriv vad som hänt, vilka handlingar som efterfrågas eller varför klagomålet lämnas." />
+              <textarea className="input min-h-40" value={form.incidentSummary} onChange={(event) => updateField("incidentSummary", event.target.value)} placeholder="Beskriv vad som hänt, vilka handlingar som efterfrågas eller varför myndigheten ska pressas vidare." />
             </label>
             <label className="space-y-2">
               <span className="eyebrow">Önskad åtgärd</span>
               <textarea className="input min-h-28" value={form.requestedAction} onChange={(event) => updateField("requestedAction", event.target.value)} />
             </label>
             <label className="space-y-2">
-              <span className="eyebrow">Rättslig grund eller stöd</span>
+              <span className="eyebrow">Stöd, källor eller tryckpunkter</span>
               <textarea className="input min-h-24" value={form.legalBasis} onChange={(event) => updateField("legalBasis", event.target.value)} />
             </label>
           </div>
@@ -290,14 +292,14 @@ export function MassAppealsWorkbench({ catalog }: { catalog: MassAppealCatalog }
               <input checked={form.urgency === "standard"} name="urgency" onChange={() => updateField("urgency", "standard")} type="radio" />
               <div>
                 <div className="font-semibold">Ordinarie</div>
-                <div className="text-(--muted) text-sm">Vanlig handläggning och normal ton.</div>
+                <div className="text-(--muted) text-sm">Stegvis tryck med tydlig bakgrund.</div>
               </div>
             </label>
             <label className="flex items-center gap-3 rounded-3xl border border-[rgba(22,32,42,0.08)] bg-white/70 p-4">
               <input checked={form.urgency === "urgent"} name="urgency" onChange={() => updateField("urgency", "urgent")} type="radio" />
               <div>
                 <div className="font-semibold">Skyndsamt</div>
-                <div className="text-(--muted) text-sm">Markerar behov av snabb respons i underlaget.</div>
+                <div className="text-(--muted) text-sm">Markerar att svaret dröjt, mörkats eller kräver omedelbar press.</div>
               </div>
             </label>
           </div>
@@ -306,9 +308,27 @@ export function MassAppealsWorkbench({ catalog }: { catalog: MassAppealCatalog }
             <div>
               <p className="eyebrow">Mottagare</p>
               <p className="mt-2 text-(--muted) text-sm leading-7">
-                Systemet förvaljer relevanta myndigheter utifrån typ och region. Du kan finjustera batchen innan förhandsgranskning.
+                Systemet förvaljer relevanta mottagare utifrån typ och region. Sök i databasen eller välj från rekommendationerna.
               </p>
             </div>
+            <EntityPicker
+              kind="authority"
+              onChange={(option) => {
+                if (!option || option.kind !== "authority") {
+                  return;
+                }
+
+                setForm((current) => ({
+                  ...current,
+                  selectedAuthorityIds: current.selectedAuthorityIds.includes(option.id)
+                    ? current.selectedAuthorityIds
+                    : [...current.selectedAuthorityIds, option.id],
+                }));
+                setAuthoritySearch(null);
+              }}
+              placeholder="Sök myndighet i databasen"
+              value={authoritySearch}
+            />
             <div className="grid gap-3 md:grid-cols-2">
               {recommendedAuthorities.map((authority) => {
                 const checked = form.selectedAuthorityIds.includes(authority.id);
@@ -388,7 +408,7 @@ export function MassAppealsWorkbench({ catalog }: { catalog: MassAppealCatalog }
                 </div>
 
                 <div className="rounded-3xl border border-[rgba(22,32,42,0.08)] bg-white/75 p-4">
-                  <p className="eyebrow">Skyddsräcken</p>
+                  <p className="eyebrow">Temporegler</p>
                   <ul className="mt-3 space-y-3 text-sm leading-7 text-(--muted)">
                     {preview.guardrails.map((item) => (
                       <li className="flex gap-3" key={item}>
@@ -406,7 +426,7 @@ export function MassAppealsWorkbench({ catalog }: { catalog: MassAppealCatalog }
               </div>
             ) : (
               <p className="mt-4 text-(--muted) text-sm leading-7">
-                Kör en förhandsgranskning för att se vilka myndigheter som väljs, hur dokumenten formuleras och vad batchen kostar innan den skickas.
+                Kör en förhandsgranskning för att se vilka myndigheter som väljs, hur dokumenten formuleras och vad batchen kostar innan du skickar iväg trycket.
               </p>
             )}
           </article>
@@ -417,7 +437,7 @@ export function MassAppealsWorkbench({ catalog }: { catalog: MassAppealCatalog }
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="eyebrow">Utskickslogg</p>
-            <h2 className="mt-2 font-title text-4xl">Spåra skickade batcher och mottagarstatus.</h2>
+            <h2 className="mt-2 font-title text-4xl">Spåra skickade batcher och se var trycket landat.</h2>
           </div>
           <p className="max-w-2xl text-(--muted) text-sm leading-7">
             Utskicken sparas i databasen och hämtas tillbaka per användare eller avsändaradress. SMTP och secure mailbox-webhooks kan kopplas in parallellt, medan manuella fall stannar kvar i statusflödet.

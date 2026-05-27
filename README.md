@@ -1,151 +1,109 @@
 # Spegeln
 
-Spegeln är en svensk produktidé och MVP för automatiserad bevakning, rapportering och publik insyn kring myndigheter och offentliga beslutsmiljöer. Fokus ligger på tre saker samtidigt: tydlig samhällsnytta, teknisk skalbarhet och juridisk återhållsamhet.
+Spegeln är en svensk plattform för myndighetsgranskning, publik insyn, samordnat mottryck och AI-stödda arbetsflöden. Repo:t är nu uppdelat för den faktiska driftmodellen: Vercel för frontend, Railway för backend och Railway för AI-worker.
 
-Den här repot är nu justerad för en hosted-first driftmodell där Vercel är primär plattform för webbappen och Railway är det naturliga valet för PostgreSQL och framtida workers.
+## Deploy-rötter
 
-## Rekommenderad stack
+- Vercel frontend root: `/`
+- Railway backend root: `backend`
+- Railway AI-worker root: `ai-worker`
 
-- Vercel för Next.js 16, React 19, TypeScript och publik webb med App Router.
-- Railway för PostgreSQL nu och för framtida cronjobb eller interna workers.
-- PostgreSQL + Prisma för relationell data kring bevakningar, rapporter, tips, användare, betalning och revisionsloggar.
-- Python + FastAPI som separat AI-tjänst för NLP, dokumentklassning, embeddings och större batchjobb, gärna som egen Railway-service senare.
-- Docker finns kvar som reservväg, men är inte längre den primära rekommendationen.
+## Arkitektur
 
-### Hosted-first produktionsriktning
+- Frontend: Next.js 16, React 19 och TypeScript i repo-roten.
+- Backend: separat Hono-baserad Node-tjänst i `backend/` för auth, sessioncookies, admin, betalningar, publika och interna API-endpoints.
+- AI-worker: separat FastAPI-tjänst i `ai-worker/` för NLP, tax analysis, triage, pressutkast, reverse surveillance och appeal generation.
+- Databas: PostgreSQL + Prisma. Schema och migrationer ligger i `prisma/` i repo-roten.
+- Proxy: frontend proxar all `/api/*`-trafik vidare till Railway-backenden via `next.config.ts`. Frontenden innehåller inte längre egna Next API-routes.
+- Docker används inte i den här strukturen.
 
-- Vercel kör frontend och Next.js-serverfunktioner nära slutanvändaren.
-- Railway levererar managed PostgreSQL utan lokal drift.
-- `vercel.json` sätter byggkommando, säkerhetsheaders och svensk regionpreferens.
-- `railway.json` lägger till healthcheck och driftinställningar om du vill köra samma app eller en worker på Railway.
+## Det som är implementerat
 
+- Svensk/engelsk frontend med sidor för startsida, pricing, juridik, guider, integritet, API-dokumentation och admin.
+- Övervakningsspegeln, Insynsindex, Myndighetsgranskaren, Folkets domstol, Reverse Surveillance, Statens svagheter, Byråkrati-bombaren och Skatteplanering.
+- Cookie-baserad auth med e-post/lösenord, anonym session och social auth för Google/GitHub när credentials finns satta.
+- Stripe-checkout, webhook-reconciliation, manuella betalningsärenden och adminuppdatering av betalningsstatus.
+- Publikt API för leaderboard, dashboard och scorecards plus OpenAPI-dokumentation på `/api/public/openapi` via frontendens proxy.
+- Prisma-baserade datamodeller för användare, bevakning, rapporter, review queues, privacy requests, AI-jobs, betalningar, usage records och civic-moduler.
+- FastAPI-worker för tax optimization, dokumentklassning, entity extraction, embeddings, anomaly detection, triage och textgenerering.
 
-## Det som är implementerat i den här repot
+## Produktionsdeploy
 
-- Svensk, responsiv Next.js-app med sidor för startsida, plattform, juridik och prissättning.
-- Ny liveorienterad startsida med auto-uppdaterad feed för granskningsärenden och videointag, plus sidomoduler för omdebatterade aktörer, loopholes och mass action.
-- Modern layout med App Router, Tailwind CSS v4 och TypeScript.
-- Prisma-schema för användare, bevakningar, rapporter, juridisk granskning, tips, usage-prissättning och audit-loggar.
-- Prisma-persistens för Byråkrati-bombaren med batcher, dokument, leveransstatus och koppling till usage records.
-- Prisma-modeller för klagomål, granskningar, leaderboard-snapshots, myndighetsscorecards, publika API-konsumenter och AI-jobb.
-- Vercel-konfiguration i `vercel.json` och Railway-konfiguration i `railway.json`.
-- Hosted-first miljöhantering för metadata, URL-upplösning och hälsokontroll.
-- Serverless-säker Prisma-klient för Vercel- och Railway-miljöer.
-- Health endpoint på `/api/health` som kan upptäcka hostmiljö och testa databasanslutning.
-- Signerad cookie-baserad autentisering med e-post/lösenord, anonym gästsession och social OAuth-beredskap för Google/GitHub.
-- Integritetscenter på `/integritet` med samtyckesinställningar, GDPR-begäran och spårbar lagring av privacy events.
-- Utbyggd betalningsmotor med Stripe checkout för kort/Klarna och manuella verifieringsflöden för Swish, BTC, XMR, LTC och kontanter.
-- Adminpanel på `/admin` för moderation, legal review, betalningskö, privacy requests, betafeedback och API-konsumenter.
-- Publik sida på `/insynsindex` med pseudonymiserad leaderboard, realtidsdashboard och reproducerbara scorecards.
-- Publika REST-endpoints under `/api/public/*` med OpenAPI-spec på `/api/public/openapi`.
-- Dokumentationsytor på `/api-dokumentation`, `/guider`, `/beta` och `/villkor`.
-- Svensk/engelsk shell-lokalisering med språkväxling i gränssnittet.
-- Separat FastAPI-worker under `ai-worker/` för tax optimization, dokumentklassning, entity extraction, embeddings, avvikelsedetektion och sammanfattningar.
-- `Myndighetsgranskaren` för anonym rapportering, AI-prioritering, pressutkast, evidensmanifest och moderation/legal review.
-- `Folkets domstol` för publik förtroendevotering, trenddata och modererade vittnesmål.
-- `Statens svagheter` för versionsstyrd wiki med kategorier, taggar och kvalitetsröstning.
-- `Reverse Surveillance` för skyddad videointag, redaktionskö, maskningspolicy och kontrollerade delningspaket.
-- `Automatiserad överklagare` inbyggd i Byråkrati-bombaren för AI-genererade överklagandebuntar och valfri automatisk submission.
-- `Övervakningsspegeln` läser nu den riktiga Prisma-datamodellen för myndigheter, profiler, alerts, rapporter och klagomål när databasen är konfigurerad, med fallbackdata endast för db-lös utveckling.
+### Vercel frontend
 
-## Monetisering
+- Root directory: `/`
+- Byggkommando: `npm run build`
+- Viktiga miljövariabler:
+  - `NEXT_PUBLIC_APP_URL`: publik frontenddomän
+  - `BACKEND_URL`: publik Railway-URL till backenden, till exempel `https://spegeln-backend.up.railway.app`
 
-Spegeln bör kombinera fyra intäktsströmmar:
+Frontend behöver inte egna databas- eller auth-hemligheter för att köra användarflödena. Auth, Stripe och databaskoppling ligger i Railway-backenden.
 
-1. Freemium för publik räckvidd och trygg tipsinlämning.
-2. Premiumabonnemang för fler bevakningar, notiser, teamfunktioner och juridiskt arbetsflöde.
-3. Pay-per-use för AI-körningar, batch-exporter och historiska jämförelser.
-4. Etiska annonser inom juridik, integritet och informationssäkerhet, tydligt märkta och manuellt granskade.
+### Railway backend
 
-Byråkrati-bombaren följer samma modell: enstaka batcher kan debiteras per körning, medan Pro och Civic Lab kan få obegränsad användning inom abuse-gränser och revisionsspår.
+- Root directory: `backend`
+- Konfiguration: `backend/railway.json`
+- Viktiga miljövariabler:
+  - `FRONTEND_URL`
+  - `DATABASE_URL`
+  - `AUTH_SESSION_SECRET`
+  - `BACKEND_PUBLIC_URL` om du vill att health och driftmetadata ska exponera backendens externa URL
+  - `STRIPE_SECRET_KEY`
+  - `STRIPE_WEBHOOK_SECRET`
+  - `STRIPE_PRICE_PLUS_MONTHLY`
+  - `STRIPE_PRICE_PRO_MONTHLY`
+  - `STRIPE_PRICE_USAGE_MASS_APPEAL`
+  - `STRIPE_PRICE_USAGE_AI_ANALYSIS`
+  - `STRIPE_PRICE_API_PARTNER`
+  - `STRIPE_PRICE_DONATION`
+  - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
+  - `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
+  - `AI_WORKER_URL`
+  - `AI_WORKER_SHARED_SECRET`
+  - `MASS_APPEALS_SMTP_*` och/eller `MASS_APPEALS_SECURE_MAILBOX_*`
 
-Skatteplaneringsmaskinen följer också premiumspåret: grundläggande legal-only analys kan visas direkt, medan djupare rapporter, kontinuerlig optimering och historiska jämförelser lämpar sig för Premium eller usage-baserad debitering.
+### Railway AI-worker
 
-## Juridiska skyddsräcken
+- Root directory: `ai-worker`
+- Konfiguration: `ai-worker/railway.json`
+- Viktiga miljövariabler:
+  - `AI_WORKER_SHARED_SECRET`
+  - `AI_PROVIDER_API_URL`
+  - `AI_PROVIDER_API_KEY`
+  - `AI_CHAT_MODEL`
 
-Detta projekt är inte juridisk rådgivning. Före skarp lansering bör plattformen granskas av svensk jurist och dataskyddsresurs.
+## Lokal utveckling
 
-Prioriterade kontrollpunkter:
+1. Kör `npm install` i repo-roten.
+2. Kör `cd backend && npm install`.
+3. Starta backenden med `npm run backend:dev`.
+4. Starta frontend med `BACKEND_URL=http://127.0.0.1:4000 npm run dev`.
+5. Om du behöver AI-workern lokalt: `pip install -r ai-worker/requirements.txt` och sedan `npm run ai:worker:dev`.
+6. Verifiera sedan `http://localhost:3000/api/health`.
 
-1. Dokumentera rättslig grund och ändamålsbegränsning för varje datatyp.
-2. Genomför DPIA för tipsflöde, AI-klassning och större personuppgiftsbehandling.
-3. Inför mänsklig och juridisk godkännandekedja innan publicering.
-4. Bygg gallring, loggning, rättelseflöden och abuse-skydd innan öppna tipsflöden skalas upp.
-5. Säkerställ att offentlig data, namnpublicering och sammanställningar bedöms mot svensk lag, GDPR och proportionalitet.
-6. Säkerställ att massutskick till myndigheter loggas, rate-limitas och kan stoppas för manuell kontroll när innehållet eller volymen kräver det.
-7. Exponera endast anonymiserade och aggregerade datapunkter i leaderboard, dashboards och öppna API:er.
-8. Håll metoder versionsstyrda per jurisdiktion så att scorecards och compliance-regler kan skilja mellan exempelvis EU och USA.
+För hostade miljöer ska variabler sättas i Vercel och Railway, inte i lokala produktionsfiler.
 
-## Kom igång utan lokal hosting
+## Prisma och databas
 
-1. Skapa en PostgreSQL-tjänst i Railway.
-2. Kopiera Railways `DATABASE_URL` till Vercel för både Preview och Production.
-3. Sätt `NEXT_PUBLIC_APP_URL` i Vercel till din primära produktionsdomän.
-4. Koppla repot till Vercel. Byggkommandot är redan definierat i `vercel.json`.
-5. Om du vill köra workers eller fallback-webb på Railway finns `railway.json` redan på plats.
-6. Kontrollera `/api/health` efter första deploy för att bekräfta URL-detektering och databasstatus.
-7. Lägg in `AUTH_SESSION_SECRET`, eventuella OAuth-nycklar och Stripe price IDs innan du aktiverar auth eller betalda planer.
+- Prisma-schema: `prisma/schema.prisma`
+- Migrationer: `prisma/migrations/`
+- Seed: `npm run db:seed` (demo-data för lokal utveckling)
+- Driftchecklista: [docs/driftchecklist.md](docs/driftchecklist.md)
+- Presskit: [docs/presskit.md](docs/presskit.md)
+- Juridisk granskning: [docs/legal-review.md](docs/legal-review.md)
+- Frontend och backend delar samma schema, men backenden genererar sin egen Prisma-klient i `backend/node_modules` vid install.
 
-### Rekommenderad releaseordning för Vercel + Railway
+## API och health
 
-1. Skapa PostgreSQL i Railway och sätt samma `DATABASE_URL` i både Railway och Vercel.
-2. Lägg webbhemligheter i Vercel: `AUTH_SESSION_SECRET`, `NEXT_PUBLIC_APP_URL`, Stripe-nycklar, OAuth-uppgifter och eventuellt `AI_WORKER_URL`.
-3. Lägg worker- eller transporthemligheter i Railway: `AI_WORKER_SHARED_SECRET`, `AI_PROVIDER_*`, `MASS_APPEALS_SMTP_*` och eventuell secure mailbox-webhook.
-4. Kör `npm run db:push` mot produktionsdatabasen innan första publika deploy om schemat ännu inte finns.
-5. Verifiera `GET /api/health` efter deploy. Endpointen visar nu separat status för databas, auth, payments, AI-worker och social auth.
-6. Gå igenom `/overvakningsspegeln`, `/insynsindex`, `/myndighetsgranskaren` och `/reverse-surveillance` i produktion för att bekräfta att liveflödena läser riktig data i stället för fallback.
+- Frontendens publika API-sökvägar ligger kvar under `/api/*`, men proxas till Railway-backenden.
+- OpenAPI: `/api/public/openapi`
+- Backend health via frontendproxy: `/api/health`
+- Backendens direkta healthcheck för Railway: `backend`-servicens `/api/health`
+- AI-workerns healthcheck: `/healthz`
 
-## Minimal lokal fallback
+## Relevanta filer
 
-1. Kopiera `.env.example` till `.env` och byt till en riktig Railway-URL eller lokal Postgres om du verkligen behöver det.
-2. Installera beroenden med `npm install`.
-3. Generera Prisma-klienten med `npm run prisma:generate`.
-4. Skapa databasschemat med `npm run db:push`.
-5. Kör även `npm run typecheck` för att verifiera den utökade auth-, privacy- och betalningsytan.
-6. Starta appen med `npm run dev`.
-
-## Viktiga miljövariabler
-
-- `AUTH_SESSION_SECRET` signerar inloggningscookies.
-- `GOOGLE_CLIENT_ID` och `GOOGLE_CLIENT_SECRET` aktiverar Google OAuth.
-- `GITHUB_CLIENT_ID` och `GITHUB_CLIENT_SECRET` aktiverar GitHub OAuth.
-- `STRIPE_PRICE_PLUS_MONTHLY`, `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_USAGE_MASS_APPEAL`, `STRIPE_PRICE_USAGE_AI_ANALYSIS`, `STRIPE_PRICE_API_PARTNER` och `STRIPE_PRICE_DONATION` kopplar köpflöden till riktiga Stripe-priser.
-- Utan dessa nycklar fungerar manuella betalningsförfrågningar fortfarande, men kort/Klarna-checkout kan inte startas.
-
-### Leveranstransport för Byråkrati-bombaren
-
-- Sätt `MASS_APPEALS_SMTP_*` för faktiska utskick till registratorer och vanliga myndighetsadresser.
-- Sätt `MASS_APPEALS_SECURE_MAILBOX_WEBHOOK_URL` och eventuellt `MASS_APPEALS_SECURE_MAILBOX_API_KEY` för mottagare som går via säker brevlåda eller extern meddelandetjänst.
-- Utan dessa variabler sparas batcherna fortfarande i Prisma, men leveranser utan konfigurerad transport markeras som misslyckade eller manuella.
-
-### AI-worker och öppet API
-
-- Sätt `AI_WORKER_URL` och `AI_WORKER_SHARED_SECRET` i Next.js-miljön för att aktivera tax optimization och andra AI-jobb via FastAPI-workern.
-- Sätt `AI_PROVIDER_API_URL`, `AI_PROVIDER_API_KEY` och `AI_CHAT_MODEL` i worker-miljön för att slå på modellbaserad analys; annars används deterministiska fallback-regler.
-- FastAPI ger Swagger/OpenAPI automatiskt på worker-sidan, medan webbappen publicerar anonymiserade REST-endpoints på `/api/public/leaderboard`, `/api/public/dashboard` och `/api/public/scorecards`.
-- API-konsumenter registreras via `POST /api/public/register` och skyddas med hashade API-nycklar, scopes och enkel timbaserad rate limiting i PostgreSQL.
-- API-accessnivåer beskrivs även på `/api/public/access-tiers` och i docsytan `/api-dokumentation`.
-- Land, region och locale är nu egna fält i datamodellen så att myndigheter, mallar, scorecards och användarflöden kan särskiljas per jurisdiktion.
-- Videoflödet är medvetet byggt med tredjemansmaskning och juridisk kontroll före publicering; det ska inte användas för omodererad exponering av privatpersoner.
-
-## Produktdrift och release
-
-- GitHub Actions-workflow i `.github/workflows/ci.yml` kör Prisma-validate, lint, typecheck, build, npm audit och Python-compile för AI-workern.
-- `CHANGELOG.md` innehåller release notes för 0.1.0 och 0.2.0.
-- `docs/launch-plan.md` beskriver beta, feedbackhantering, press kit och release-gates.
-- `/beta` ger ett enkelt feedbackflöde för pilotanvändare och juridiska granskare.
-
-## Användarguider och juridik
-
-- `/guider` samlar vägvisare till varje större arbetsflöde.
-- `/integritet` samlar samtycken och GDPR-begäran.
-- `/villkor` täcker användarvillkor, moderation, takedown och betalningsprinciper.
-- `/juridik` behåller de övergripande svenska/EU-rättsliga skyddsräckena för publicering och databehandling.
-
-## Föreslagna nästa steg
-
-1. Färdigställ och aktivera fullständigt inloggningsflöde (t.ex. JWT, magic link eller BankID) och koppla till Prisma User-modellen.
-2. Koppla betalningar via Stripe eller liknande med usage-baserad mätning.
-3. Lägg till faktisk datainsamling från godkända svenska öppna källor.
-4. Ersätt demo-auth med ett riktigt inloggningsflöde och koppla publika alias till verifierade konton.
-5. Lägg till bakgrundsjobb för att materialisera leaderboard-snapshots och scorecards i stället för att alltid räkna dem direkt.# Spegeln
+- Frontend proxy och headers: `next.config.ts`, `vercel.json`
+- Backend service: `backend/package.json`, `backend/src/index.ts`, `backend/railway.json`
+- AI-worker service: `ai-worker/app/main.py`, `ai-worker/railway.json`
+- Prisma schema och migrationer: `prisma/schema.prisma`, `prisma/migrations/`

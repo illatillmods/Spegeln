@@ -1,4 +1,4 @@
-import { DashboardItem } from "@/lib/public-insights";
+import type { DashboardItem } from "@/lib/public-insights";
 
 type DashboardPanelProps = {
   items: DashboardItem[];

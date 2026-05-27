@@ -1,7 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import type { FailureReportView } from "@/lib/civic-features";
+import { uploadEvidenceFiles } from "@/lib/upload-evidence";
+import { FileUploadZone } from "@/components/ui/FileUploadZone";
+import { FormError, LoadingButton } from "@/components/ui/FormControls";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type Props = {
   initialItems: FailureReportView[];
@@ -14,6 +19,18 @@ function filesToEvidence(files: FileList | null) {
     byteSize: file.size,
     assetKind: file.type.startsWith("image/") ? "IMAGE" : file.type.startsWith("video/") ? "VIDEO" : "DOCUMENT",
   }));
+}
+
+async function buildEvidence(files: FileList | null) {
+  if (!files || files.length === 0) {
+    return [];
+  }
+
+  try {
+    return await uploadEvidenceFiles(files);
+  } catch {
+    return filesToEvidence(files);
+  }
 }
 
 export function AuthorityFailuresClient({ initialItems }: Props) {
@@ -38,7 +55,7 @@ export function AuthorityFailuresClient({ initialItems }: Props) {
           title,
           summary,
           anonymousAlias: alias,
-          evidence: filesToEvidence(files),
+          evidence: await buildEvidence(files),
         }),
       });
       const data = await response.json();
@@ -65,34 +82,33 @@ export function AuthorityFailuresClient({ initialItems }: Props) {
           <p className="eyebrow">Anonymt uppladdningsflöde</p>
           <h2 className="mt-2 font-title text-4xl">Rapportera fel, maktmissbruk och skandaler.</h2>
         </div>
-        <input className="input" placeholder="Kort titel" value={title} onChange={(event) => setTitle(event.target.value)} />
-        <textarea className="input min-h-40" placeholder="Beskriv händelsen, vad du såg och varför det är allvarligt." value={summary} onChange={(event) => setSummary(event.target.value)} />
+        <input className="input" placeholder="Kort titel" required value={title} onChange={(event) => setTitle(event.target.value)} />
+        <textarea className="input min-h-40" placeholder="Beskriv händelsen." required value={summary} onChange={(event) => setSummary(event.target.value)} />
         <input className="input" placeholder="Valfritt alias" value={alias} onChange={(event) => setAlias(event.target.value)} />
-        <input className="input" multiple onChange={(event) => setFiles(event.target.files)} type="file" />
-        <p className="text-(--muted) text-sm leading-7">Text, bild, dokument och video kan skickas in. I denna kodbas sparas filmanifest och granskningsspår; produktion bör kopplas till krypterad objektlagring.</p>
-        {error ? <div className="rounded-3xl border border-[rgba(153,27,27,0.25)] bg-white/80 px-4 py-3 text-sm text-[rgb(127,29,29)]">{error}</div> : null}
-        <button className="btn-primary" disabled={pending} type="submit">{pending ? "Analyserar..." : "Skicka anonym rapport"}</button>
+        <FileUploadZone helper="Text, bild, dokument och video." multiple onChange={setFiles} />
+        {error ? <FormError message={error} /> : null}
+        <LoadingButton loading={pending} loadingLabel="Analyserar..." type="submit">
+          Skicka anonym rapport
+        </LoadingButton>
       </form>
 
       <section className="space-y-4">
-        {items.map((item) => (
-          <article className="surface rounded-4xl p-5" key={item.id}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="eyebrow">{item.anonymousAlias || "Anonym källa"}</p>
-                <h3 className="mt-2 text-2xl font-semibold">{item.title}</h3>
+        {items.length === 0 ? (
+          <EmptyState description="Var först med att lämna in ett granskningsärende." title="Inga publicerade ärenden" />
+        ) : (
+          items.map((item) => (
+            <Link className="block surface rounded-4xl p-5 transition hover:-translate-y-0.5" href={`/rapporter/${item.id}`} key={item.id}>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="eyebrow">{item.anonymousAlias || "Anonym källa"}</p>
+                  <h3 className="mt-2 text-2xl font-semibold">{item.title}</h3>
+                </div>
+                <span className="tag">{item.aiSeverity}</span>
               </div>
-              <span className="tag">{item.aiSeverity} / {item.aiPriorityScore}</span>
-            </div>
-            <p className="mt-3 text-(--muted) text-sm leading-7">{item.summary}</p>
-            <p className="mt-3 text-sm">{item.aiSummary}</p>
-            <div className="mt-4 flex flex-wrap gap-2 text-xs text-(--muted)">
-              <span className="tag">{item.lifecycleStatus}</span>
-              <span className="tag">Bevis: {item.evidenceCount}</span>
-              {item.authorityName ? <span className="tag">{item.authorityName}</span> : null}
-            </div>
-          </article>
-        ))}
+              <p className="mt-3 text-(--muted) text-sm leading-7">{item.summary}</p>
+            </Link>
+          ))
+        )}
       </section>
     </div>
   );

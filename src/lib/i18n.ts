@@ -9,12 +9,12 @@ export const LOCALE_COOKIE_NAME = "spegeln_locale";
 
 const dictionaries = {
   sv: {
-    brandTagline: "Ansvarsfull transparens",
+    brandTagline: "Maximal insyn mot makten",
     nav: {
       platform: "Plattform",
       pricing: "Prissättning",
-      legal: "Juridik",
-      privacy: "Integritet",
+      legal: "Manifest",
+      privacy: "Spårkontroll",
       guides: "Guider",
       api: "API",
       beta: "Beta",
@@ -23,10 +23,10 @@ const dictionaries = {
     },
     footer: {
       copy:
-        "Spegeln är designad för offentlig insyn, inte för automatisk utpekning. All publicering ska föregås av mänsklig och juridisk granskning.",
-      built: "Byggd som svensk MVP för myndighetsbevakning",
+        "Spegeln finns inte för att låta myndighetsspråk stå oemotsagt. Vi samlar signaler, dokument och vittnesmål för att pressa makten ut i ljuset.",
+      built: "Byggd i Sverige för att störa maktens bekvämlighet",
       stack: "Vercel, Railway, Next.js och Prisma",
-      review: "Juridisk granskning krävs före skarp drift",
+      review: "Ingen neutral kuliss. Bara öppet mottryck.",
     },
     utility: {
       skipToContent: "Hoppa till innehåll",
@@ -34,12 +34,12 @@ const dictionaries = {
     },
   },
   en: {
-    brandTagline: "Responsible transparency",
+    brandTagline: "Maximum transparency",
     nav: {
       platform: "Platform",
       pricing: "Pricing",
-      legal: "Legal",
-      privacy: "Privacy",
+      legal: "Manifesto",
+      privacy: "Trace control",
       guides: "Guides",
       api: "API",
       beta: "Beta",
@@ -48,10 +48,10 @@ const dictionaries = {
     },
     footer: {
       copy:
-        "Spegeln is designed for public accountability, not automated accusation. Publication should always pass human editorial and legal review.",
-      built: "Built as a Swedish watchdog MVP",
+        "Spegeln is not here to make official language feel comfortable. It collects signals, documents, and testimony to drag power into the light.",
+      built: "Built in Sweden to disturb institutional comfort",
       stack: "Vercel, Railway, Next.js and Prisma",
-      review: "Legal review is required before production launch",
+      review: "No neutral facade. Only public pressure.",
     },
     utility: {
       skipToContent: "Skip to content",

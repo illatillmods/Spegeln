@@ -1,3 +1,5 @@
+import { SubscriptionTier } from "@prisma/client";
+
 export const paymentMethodCatalog = [
   {
     id: "CARD",
@@ -16,21 +18,21 @@ export const paymentMethodCatalog = [
   {
     id: "SWISH",
     label: "Swish",
-    description: "Manual verified payment request until a PSP-backed Swish flow is connected.",
+    description: "Manual payment request until a PSP-backed Swish flow is connected.",
     discountPercent: 0,
     usesStripeCheckout: false,
   },
   {
     id: "BTC",
     label: "Bitcoin",
-    description: "Manual crypto settlement with compliance review and wallet verification.",
+    description: "Manual crypto settlement with direct wallet confirmation.",
     discountPercent: 25,
     usesStripeCheckout: false,
   },
   {
     id: "XMR",
     label: "Monero",
-    description: "Manual privacy-preserving settlement with admin review.",
+    description: "Manual discreet settlement with direct confirmation.",
     discountPercent: 25,
     usesStripeCheckout: false,
   },
@@ -44,7 +46,7 @@ export const paymentMethodCatalog = [
   {
     id: "CASH",
     label: "Cash",
-    description: "Offline payment workflow with explicit moderation and legal review.",
+    description: "Offline payment workflow with manual activation.",
     discountPercent: 50,
     usesStripeCheckout: false,
   },
@@ -106,6 +108,23 @@ export function getPurchaseConfig(key: string) {
 
 export function calculateDiscountedAmount(amountSek: number, discountPercent: number) {
   return Math.max(0, Math.round((amountSek * (100 - discountPercent)) / 100));
+}
+
+export function findPurchaseKeyByStripePriceId(priceId: string): PurchaseKey | null {
+  const match = Object.entries(purchaseCatalog).find(([, config]) => process.env[config.stripePriceEnvKey] === priceId);
+  return match ? (match[0] as PurchaseKey) : null;
+}
+
+export function getManagedSubscriptionTierForPurchase(key: PurchaseKey | null) {
+  if (key === "plus_monthly") {
+    return SubscriptionTier.PLUS;
+  }
+
+  if (key === "pro_monthly") {
+    return SubscriptionTier.PRO;
+  }
+
+  return null;
 }
 
 export function resolveStripePaymentTypes(method: PaymentMethodId) {

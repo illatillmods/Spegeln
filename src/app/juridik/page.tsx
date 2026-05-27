@@ -13,8 +13,8 @@ const toneClasses = {
 };
 
 export const metadata: Metadata = {
-  title: "Juridik",
-  description: "Juridiska skyddsräcken och granskningspunkter för Spegeln enligt svensk och EU-rättslig kontext.",
+  title: "Manifest",
+  description: "Spegelns manifest för protest, maximal insyn och öppet mottryck mot etablissemanget.",
 };
 
 export default function LegalPage() {
@@ -22,20 +22,20 @@ export default function LegalPage() {
     <div className="shell space-y-20 pb-20 pt-10 md:pt-14">
       <section className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
         <div className="space-y-5 reveal">
-          <p className="eyebrow">Juridisk inramning</p>
+          <p className="eyebrow">Manifest</p>
           <h1 className="max-w-3xl font-title text-5xl leading-none sm:text-6xl">
-            Plattformen måste tåla granskning även när den granskar andra.
+            Vi byggde inte Spegeln för att låta rimliga.
           </h1>
           <p className="max-w-2xl text-(--muted) text-lg leading-8">
-            Den här implementationen innehåller produktmässiga skyddsräcken för GDPR, offentlig data, proportionalitet, automatiserade myndighetsutskick och ansvarig publicering. Det är inte juridisk rådgivning, utan ett underlag som ska granskas av svensk jurist före skarp drift.
+            Sajten finns för att skava mot myndighetsspråk, dra dokument ur skuggorna och göra institutionell bekvämlighet dyrare. Den är byggd för protest, maximal insyn och öppet mottryck.
           </p>
         </div>
 
         <aside className="surface-strong rounded-4xl p-6 md:p-8 reveal" style={{ animationDelay: "120ms" }}>
-          <p className="eyebrow">Viktig disclaimer</p>
-          <h2 className="mt-3 font-title text-4xl">Ingen automatisk publicering av anklagelser.</h2>
+          <p className="eyebrow">Ingen neutral pose</p>
+          <h2 className="mt-3 font-title text-4xl">Det här är ett långfinger mot stängda dörrar.</h2>
           <p className="mt-4 text-(--muted) text-sm leading-7">
-            Automatiserade modeller får stödja sortering, sammanfattning, prioritering och myndighetsutskick, men ska inte ensamma skapa offentliga påståenden om individer eller myndighetspersoner.
+            Profiler, batcher, video, wiki och scorecards finns här för att samla spår, förstärka mönster och göra det lättare att fortsätta trycka när myndigheter hoppas att frågan ska dö.
           </p>
           <ul className="text-(--foreground) mt-6 space-y-3 text-sm leading-7">
             {launchChecklist.slice(0, 3).map((item) => (
@@ -51,7 +51,7 @@ export default function LegalPage() {
       <section className="grid gap-4 md:grid-cols-2">
         {legalPillars.map((pillar, index) => (
           <article className={`surface rounded-[1.9rem] p-6 reveal ${toneClasses[pillar.tone]}`} key={pillar.title} style={{ animationDelay: `${index * 100}ms` }}>
-            <p className="eyebrow">Rättslig pelare</p>
+            <p className="eyebrow">Front</p>
             <h2 className="mt-3 font-title text-3xl">{pillar.title}</h2>
             <p className="mt-4 text-(--muted) text-sm leading-7">{pillar.description}</p>
             <ul className="text-(--foreground) mt-5 space-y-3 text-sm leading-6">
@@ -68,8 +68,8 @@ export default function LegalPage() {
 
       <section className="grid gap-4 md:grid-cols-2">
         <article className="surface rounded-4xl p-6 md:p-8 reveal">
-          <p className="eyebrow">Redaktionella principer</p>
-          <h2 className="mt-3 font-title text-4xl">Det här får inte bli ett ryktesverktyg.</h2>
+          <p className="eyebrow">Drivkrafter</p>
+          <h2 className="mt-3 font-title text-4xl">Fyra saker Spegeln tänker göra mot makten.</h2>
           <ul className="text-(--foreground) mt-6 space-y-4 text-sm leading-7">
             {governancePrinciples.map((principle) => (
               <li className="flex gap-3" key={principle}>
@@ -81,8 +81,8 @@ export default function LegalPage() {
         </article>
 
         <article className="surface rounded-4xl p-6 md:p-8 reveal" style={{ animationDelay: "120ms" }}>
-          <p className="eyebrow">Annonsregler</p>
-          <h2 className="mt-3 font-title text-4xl">Etisk annonsering kräver hårda gränser.</h2>
+          <p className="eyebrow">Finansiering</p>
+          <h2 className="mt-3 font-title text-4xl">Pengar ska hålla trycket igång, inte putsa budskapet.</h2>
           <ul className="text-(--foreground) mt-6 space-y-4 text-sm leading-7">
             {ethicalAdRules.map((rule) => (
               <li className="flex gap-3" key={rule}>
@@ -95,9 +95,9 @@ export default function LegalPage() {
       </section>
 
       <section className="surface-strong rounded-[2.2rem] p-6 md:p-8 reveal">
-        <p className="eyebrow">Legal review points</p>
+        <p className="eyebrow">Nästa offensiv</p>
         <h2 className="mt-3 max-w-4xl font-title text-4xl sm:text-5xl">
-          Punkter som bör granskas av svensk jurist och dataskyddsresurs innan lansering.
+          Det som ska göra plattformen ännu svårare att ignorera.
         </h2>
         <div className="mt-6 grid gap-3 md:grid-cols-2">
           {launchChecklist.map((item) => (
@@ -107,7 +107,7 @@ export default function LegalPage() {
           ))}
         </div>
         <p className="mt-6 text-(--muted) text-sm leading-7">
-          Särskild uppmärksamhet bör läggas på ansvarsfördelning, behandling av personuppgifter i tips, eventuella sekretessfrågor, namnpublicering samt hur generativ AI används i beslutsstödet.
+          Fokus ligger på fler öppna spår, råare export, starkare community och mindre friktion mellan upptäckt och offentlig press.
         </p>
       </section>
     </div>

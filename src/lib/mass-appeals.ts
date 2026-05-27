@@ -36,11 +36,11 @@ const appealTypeDefinitions: AppealTypeDefinition[] = [
   },
   {
     id: "gdpr",
-    label: "GDPR-begäran",
-    summary: "Begär registerutdrag, rättelse eller klagomål till Integritetsskyddsmyndigheten och berörd myndighet.",
-    defaultRequestedAction: "Jag begär registerutdrag eller rättelse och vill få svar inom tillämpliga frister enligt GDPR.",
-    defaultLegalBasis: "Artiklarna 12, 15, 16 och 77 i GDPR beroende på begärans art.",
-    defaultSubjectPrefix: "GDPR-begäran",
+    label: "Registerkrav",
+    summary: "Kräv utdrag, rättelser eller tydliga besked från myndigheter som samlar på sig uppgifter och svarar långsamt.",
+    defaultRequestedAction: "Jag kräver ett fullständigt utdrag, rättelse eller tydligt besked om hur mina uppgifter används och när jag får svar.",
+    defaultLegalBasis: "Dataskyddsregler, offentlighetsprincip och myndighetens skyldighet att svara skriftligt.",
+    defaultSubjectPrefix: "Registerkrav",
   },
   {
     id: "info",
@@ -169,19 +169,19 @@ const billingModels: MassAppealCatalog["billingModels"] = [
   {
     id: "payg",
     label: "Pay-per-use",
-    summary: "Från 39 kr per körning och därefter per mottagare. Passar engångsärenden och kampanjer.",
+    summary: "Från 39 kr per körning och därefter per mottagare. Passar engångsärenden och snabba kampanjer.",
   },
   {
     id: "subscription",
     label: "Abonnemang",
-    summary: "Ingår i Pro/Civic Lab med mjuka spärrar för missbruk och högvolymskörningar.",
+    summary: "Ingår i Pro/Civic Lab med högre tempo för återkommande kampanjer och batcher.",
   },
 ];
 
 const antiAbuseSummary = [
-  "Högst 2 skarpa utskick per 15 minuter och högst 6 mottagare per batch i denna MVP.",
-  "Länktunga eller uppenbart massproducerade texter stoppas för manuell granskning.",
-  "Varje utskick loggas med användare, mottagare, leveranssätt, tidpunkt och spårningskod för efterhandskontroll.",
+  "Tempotak i denna MVP: högst 2 skarpa utskick per 15 minuter och högst 6 mottagare per batch.",
+  "Länktunga eller uppenbart massproducerade texter fångas upp för extra kontroll innan de går ut.",
+  "Varje utskick märks med användare, mottagare, leveranssätt, tidpunkt och spårningskod så att du ser hur trycket rör sig.",
 ];
 
 const previewWindowMs = 15 * 60 * 1000;
@@ -197,7 +197,6 @@ type RateBucket = {
 };
 
 type MassAppealsStore = {
-  batches: MassAppealBatch[];
   rateBuckets: Map<string, RateBucket>;
 };
 
@@ -233,7 +232,6 @@ declare global {
 function getStore(): MassAppealsStore {
   if (!globalThis.__spegelnMassAppealsStore) {
     globalThis.__spegelnMassAppealsStore = {
-      batches: [],
       rateBuckets: new Map<string, RateBucket>(),
     };
   }
@@ -469,7 +467,7 @@ function buildDocumentBody(payload: MassAppealPayload, authority: AuthorityTarge
 
   const introByType: Record<AppealType, string> = {
     jo: "Jag vill anmäla brister i myndighetsutövning och begär att ärendet registreras för tillsyn eller vidare prövning.",
-    gdpr: "Jag vill utöva mina rättigheter enligt dataskyddsregelverket och begär skriftlig återkoppling inom tillämplig tidsfrist.",
+    gdpr: "Jag kräver ett tydligt utdrag över vilka uppgifter ni håller, hur de används och när jag får skriftligt svar.",
     info: "Jag begär utlämning av allmän handling eller tydligt besked om eventuell sekretessprövning.",
     klagomal: "Jag vill lämna ett formellt klagomål och begär en dokumenterad återkoppling från ansvarig funktion.",
   };
@@ -529,7 +527,7 @@ function buildRecipientStatuses(recipients: AuthorityTarget[], payload: MassAppe
       estimatedResponseDays: authority.estimatedResponseDays,
       feeSek: pricing.billingModel === "payg" ? (index === 0 ? 39 : 14) : 0,
       notes: requiresManualReview
-        ? ["Stoppad för manuell kontroll eftersom underlaget är ovanligt långt eller länktungt."]
+        ? ["Fångad för extra kontroll eftersom underlaget är ovanligt långt eller länktungt."]
         : ["Mottagaren placerades i kö utifrån vald ärendetyp och region."],
       updatedAt: new Date().toISOString(),
     };
@@ -538,24 +536,24 @@ function buildRecipientStatuses(recipients: AuthorityTarget[], payload: MassAppe
 
 function buildGuardrails(payload: MassAppealPayload, recipients: AuthorityTarget[]) {
   const warnings = [
-    "Massutskick ska endast användas för sakliga och spårbara begäranden. Inga hot, trakasserier eller osanna anklagelser får skickas.",
-    "Automatiska batcher loggas med spårningskod, tidpunkt och mottagare för efterhandskontroll.",
+    "Massutskick är till för tydligt tryck uppåt mot myndigheter och registratorer, inte för att skjuta brett i blindo.",
+    "Automatiska batcher märks med spårningskod, tidpunkt och mottagare så att du kan följa vad som faktiskt gått ut.",
   ];
 
   if (payload.appealType === "gdpr") {
-    warnings.push("GDPR-begäranden bör begränsas till uppgifter som rör dig eller ett tydligt mandat. Känsliga uppgifter kräver extra försiktighet.");
+    warnings.push("Registerkrav fungerar bäst när du pekar ut vilket konto, ärende eller dataspår du vill tvinga fram.");
   }
 
   if (payload.appealType === "info") {
-    warnings.push("Informationsbegäranden måste fortfarande kunna sekretessprövas. Uteblivet utlämnande kräver separat överklagande eller komplettering.");
+    warnings.push("Informationsbegäran vinner på precision; om de mörkar får du följa upp med nytt tryck eller överklagande.");
   }
 
   if (payload.billingModel === "subscription") {
-    warnings.push("Abonnemangsutskick kräver inloggat Pro- eller Civic Lab-konto för att kunna kopplas till rätt usage- och auditspår.");
+    warnings.push("Abonnemangsutskick kräver inloggat Pro- eller Civic Lab-konto för högre tempo och full historik.");
   }
 
   if (recipients.length >= 4) {
-    warnings.push("Större batcher kan ge sämre träffsäkerhet. Välj färre och mer relevanta mottagare när du kan.");
+    warnings.push("Stora batcher sprider kraften. Färre mottagare ger oftare tydligare träff.");
   }
 
   return warnings;
@@ -726,10 +724,7 @@ async function resolveBatchUserId(senderEmail: string, actor: MassAppealActorCon
 async function persistBatch(batch: MassAppealBatch, payload: MassAppealPayload, actor: MassAppealActorContext) {
   const prisma = getPrismaClient();
   if (!prisma) {
-    const store = getStore();
-    store.batches.unshift(batch);
-    store.batches = store.batches.slice(0, 12);
-    return batch;
+    throw new MassAppealError("Databaspersistens krävs för att skicka och spåra batcher.", 503);
   }
 
   const now = new Date();
@@ -875,6 +870,45 @@ export function getMassAppealCatalog(): MassAppealCatalog {
   };
 }
 
+export async function getMassAppealCatalogAsync(): Promise<MassAppealCatalog> {
+  const base = getMassAppealCatalog();
+  const prisma = getPrismaClient();
+
+  if (!prisma) {
+    return base;
+  }
+
+  const authorities = await prisma.authority.findMany({
+    orderBy: { updatedAt: "desc" },
+    take: 40,
+  });
+
+  const merged = [...base.authorities];
+  const existingIds = new Set(merged.map((item) => item.id));
+
+  for (const authority of authorities) {
+    if (existingIds.has(authority.id) || existingIds.has(authority.slug)) {
+      continue;
+    }
+
+    merged.push({
+      id: authority.id,
+      name: authority.name,
+      category: "registrator" as const,
+      region: authority.region || "Nationell",
+      channel: "E-postgateway",
+      endpoint: `registrator@${authority.slug.replace(/-/g, "")}.se`,
+      estimatedResponseDays: 30,
+      supportedAppealTypes: ["info", "klagomal", "gdpr"],
+    });
+  }
+
+  return {
+    ...base,
+    authorities: merged,
+  };
+}
+
 export function previewMassAppeal(raw: unknown, actorKey: string) {
   const payload = parsePayload(raw);
   return buildPreviewInternal(payload, actorKey, true);
@@ -911,17 +945,7 @@ export async function listRecentMassAppealBatches(options?: { limit?: number; se
   const prisma = getPrismaClient();
 
   if (!prisma) {
-    const store = getStore();
-    const filtered = store.batches.filter((batch) => {
-      if (options?.userId) {
-        return true;
-      }
-      if (options?.senderEmail) {
-        return batch.senderEmail === options.senderEmail;
-      }
-      return false;
-    });
-    return filtered.slice(0, limit);
+    return [];
   }
 
   if (!options?.userId && !options?.senderEmail) {

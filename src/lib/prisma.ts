@@ -25,3 +25,13 @@ export function getPrismaClient() {
 
   return globalForPrisma.prisma;
 }
+
+export function requirePrismaClient(errorMessage = "DATABASE_URL saknas. Databaspersistens krävs för den här funktionen.") {
+  const prisma = getPrismaClient();
+
+  if (!prisma) {
+    throw new Error(errorMessage);
+  }
+
+  return prisma;
+}

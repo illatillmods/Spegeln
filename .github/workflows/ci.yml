@@ -1,29 +1,54 @@
 name: CI
 
 on:
-  pull_request:
   push:
-    branches:
-      - main
+    branches: [main]
+  pull_request:
 
 jobs:
-  validate:
+  verify:
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: spegeln
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/spegeln
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies
+      - name: Install root dependencies
         run: npm ci
 
-      - name: Prisma validate
-        run: npx prisma validate
+      - name: Install backend dependencies
+        run: npm ci
+        working-directory: backend
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Seed demo data
+        run: npm run db:seed
 
       - name: Lint
         run: npm run lint
@@ -31,53 +56,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Build
+      - name: Build frontend
         run: npm run build
 
-      - name: Audit high vulnerabilities
-        run: npm audit --audit-level=high
+      - name: Build backend
+        run: npm run backend:build
 
-  ai-worker:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install worker dependencies
-        run: pip install -r ai-worker/requirements.txt
-
-      - name: Compile worker
-        run: python -m compileall ai-worker/app
-
-  deploy-vercel:
-    runs-on: ubuntu-latest
-    needs:
-      - validate
-      - ai-worker
-    if: github.ref == 'refs/heads/main' && vars.VERCEL_PROJECT_ID != '' && vars.VERCEL_ORG_ID != '' && secrets.VERCEL_TOKEN != ''
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-
-      - name: Pull Vercel environment
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build Vercel output
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy Vercel output
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Compile AI worker
+        run: npm run ai:worker:compile

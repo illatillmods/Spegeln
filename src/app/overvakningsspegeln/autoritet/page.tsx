@@ -1,5 +1,6 @@
 import { WatchSubscriptionPanel } from "@/components/watchdog/WatchSubscriptionPanel";
-import { getWatchdogAuthorities } from "@/lib/watchdog";
+import type { WatchAuthorityCard } from "@/lib/watchdog";
+import { serverApiJson } from "@/lib/server-api";
 
 export const metadata = {
   title: "Myndigheter | Övervakningsspegeln",
@@ -7,7 +8,8 @@ export const metadata = {
 };
 
 export default async function AuthorityDirectoryPage() {
-  const authorities = await getWatchdogAuthorities();
+  const authoritiesResponse = await serverApiJson<{ items: WatchAuthorityCard[] }>("/api/watchdog/authorities");
+  const authorities = authoritiesResponse.items;
 
   return (
     <div className="shell space-y-12 pb-20 pt-10 md:pt-14">
@@ -77,6 +79,7 @@ export default async function AuthorityDirectoryPage() {
 
             <div className="reveal" style={{ animationDelay: `${index * 80 + 120}ms` }}>
               <WatchSubscriptionPanel
+                authorityId={authority.id}
                 defaultChannels={authority.watchTarget.defaultChannels}
                 note={authority.watchTarget.note}
                 recommendedCadence={authority.watchTarget.recommendedCadence}

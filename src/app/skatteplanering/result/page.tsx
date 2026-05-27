@@ -35,9 +35,17 @@ export default function ResultPage() {
   if (!result) return null;
 
   return (
-    <main className="max-w-xl mx-auto py-10 px-4">
+    <div className="shell space-y-8 pb-20 pt-10 md:pt-14">
+      <section className="space-y-4 reveal">
+        <p className="eyebrow">Steg 2</p>
+        <h1 className="font-title text-5xl leading-none sm:text-6xl">Här är analysens första förslag.</h1>
+        <p className="max-w-2xl text-(--muted) text-lg leading-8">
+          Resultatet visas direkt i samma flöde. Vill du köra om eller justera input går du tillbaka till onboarding utan att lämna modulen.
+        </p>
+      </section>
+
       <SkatteplaneringResult strategies={result.strategies} disclaimer={result.disclaimer} />
-      {result.premium && <ReportPremiumLock />}
-    </main>
+      {result.premium ? <ReportPremiumLock /> : null}
+    </div>
   );
 }

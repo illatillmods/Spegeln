@@ -1,30 +1,38 @@
-import {
-  getConfidenceBoard,
-  listAuthorityFailureReports,
-  listReverseSurveillance,
-  listWikiPages,
-} from "@/lib/civic-features";
-import { getWatchdogAuthorities, getWatchdogSnapshot } from "@/lib/watchdog";
+import type { ConfidenceBoardEntry, FailureReportView, ReverseSurveillanceView, WikiPageView } from "@/lib/civic-features";
+import type { WatchAuthorityCard, WatchdogSnapshot } from "@/lib/watchdog";
+import { serverApiJsonSafe } from "@/lib/server-api";
 import { FrontPageLiveClient } from "./FrontPageLiveClient";
 
+const emptySnapshot: WatchdogSnapshot = {
+  totalTrackedRecords: 0,
+  officialsCovered: 0,
+  authoritiesCovered: 0,
+  publishedReports: 0,
+  liveAlerts: 0,
+  dailySyncCoverage: "Anslut databasen och kör seed för att se live-signaler.",
+  publicSourceFamilies: [],
+  guardrails: [],
+};
+
 export default async function HomePage() {
-  const [initialReports, initialVideos, confidenceBoard, wikiPages, snapshot, authorities] = await Promise.all([
-    listAuthorityFailureReports(8),
-    listReverseSurveillance(6),
-    getConfidenceBoard(6),
-    listWikiPages(6),
-    getWatchdogSnapshot(),
-    getWatchdogAuthorities(),
+  const [reportsResponse, videosResponse, boardResponse, wikiResponse, snapshotResponse, authoritiesResponse] = await Promise.all([
+    serverApiJsonSafe<{ items: FailureReportView[] }>("/api/myndighetsgranskaren/reports", { items: [] }),
+    serverApiJsonSafe<{ items: ReverseSurveillanceView[] }>("/api/reverse-surveillance/submissions", { items: [] }),
+    serverApiJsonSafe<{ items: ConfidenceBoardEntry[] }>("/api/folkets-domstol/board", { items: [] }),
+    serverApiJsonSafe<{ items: WikiPageView[] }>("/api/statens-svagheter/pages", { items: [] }),
+    serverApiJsonSafe<{ snapshot: WatchdogSnapshot }>("/api/watchdog/snapshot", { snapshot: emptySnapshot }),
+    serverApiJsonSafe<{ items: WatchAuthorityCard[] }>("/api/watchdog/authorities", { items: [] }),
   ]);
 
   return (
     <FrontPageLiveClient
-      authorities={authorities}
-      confidenceBoard={confidenceBoard}
-      initialReports={initialReports}
-      initialVideos={initialVideos}
-      snapshot={snapshot}
-      wikiPages={wikiPages}
+      apiReady={reportsResponse.ok && snapshotResponse.ok}
+      authorities={authoritiesResponse.data.items}
+      confidenceBoard={boardResponse.data.items}
+      initialReports={reportsResponse.data.items}
+      initialVideos={videosResponse.data.items}
+      snapshot={snapshotResponse.data.snapshot}
+      wikiPages={wikiResponse.data.items}
     />
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 type WatchChannel = "email" | "browser" | "rss";
 type WatchCadence = "REALTIME" | "HOURLY" | "DAILY";
@@ -14,10 +14,19 @@ type StoredWatch = {
   savedAt: string;
 };
 
+type ServerWatch = {
+  id: string;
+  authorityId: string;
+  authorityName: string;
+  cadence: WatchCadence;
+  updatedAt: string;
+};
+
 type WatchSubscriptionPanelProps = {
   targetId: string;
   targetType: "official" | "authority";
   targetName: string;
+  authorityId: string;
   recommendedCadence: WatchCadence;
   defaultChannels: WatchChannel[];
   note: string;
@@ -45,11 +54,7 @@ function readStoredWatches() {
 
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-
-    if (!raw) {
-      return [] as StoredWatch[];
-    }
-
+    if (!raw) return [] as StoredWatch[];
     const parsed = JSON.parse(raw) as StoredWatch[];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
@@ -68,10 +73,8 @@ function subscribeToStoredWatches(callback: () => void) {
   }
 
   const notify = () => callback();
-
   window.addEventListener("storage", notify);
   window.addEventListener(STORAGE_EVENT, notify);
-
   return () => {
     window.removeEventListener("storage", notify);
     window.removeEventListener(STORAGE_EVENT, notify);
@@ -86,6 +89,7 @@ export function WatchSubscriptionPanel({
   targetId,
   targetType,
   targetName,
+  authorityId,
   recommendedCadence,
   defaultChannels,
   note,
@@ -97,25 +101,47 @@ export function WatchSubscriptionPanel({
   );
   const [draftCadence, setDraftCadence] = useState<WatchCadence | null>(null);
   const [draftChannels, setDraftChannels] = useState<WatchChannel[] | null>(null);
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [serverWatch, setServerWatch] = useState<ServerWatch | null>(null);
+  const [syncNote, setSyncNote] = useState<string | null>(null);
 
-  const cadence = draftCadence ?? storedWatch?.cadence ?? recommendedCadence;
+  const cadence = draftCadence ?? storedWatch?.cadence ?? (loggedIn ? serverWatch?.cadence : undefined) ?? recommendedCadence;
   const channels = draftChannels ?? storedWatch?.channels ?? defaultChannels;
-  const isActive = Boolean(storedWatch);
-  const savedAt = storedWatch?.savedAt ?? null;
+  const isActive = Boolean(storedWatch || (loggedIn && serverWatch));
+  const savedAt = storedWatch?.savedAt ?? (loggedIn ? serverWatch?.updatedAt : undefined) ?? null;
+
+  useEffect(() => {
+    void fetch("/api/me")
+      .then((response) => response.ok)
+      .then(setLoggedIn)
+      .catch(() => setLoggedIn(false));
+  }, []);
+
+  useEffect(() => {
+    if (!loggedIn) {
+      return;
+    }
+
+    void fetch("/api/konto/watches")
+      .then((response) => response.json())
+      .then((data: { items?: ServerWatch[] }) => {
+        const match = (data.items || []).find((watch) => watch.authorityId === authorityId) || null;
+        setServerWatch(match);
+      })
+      .catch(() => setServerWatch(null));
+  }, [loggedIn, authorityId]);
 
   function toggleChannel(channel: WatchChannel) {
     setDraftChannels((currentChannels) => {
       const nextChannels = currentChannels ?? channels;
-
       if (nextChannels.includes(channel)) {
         return nextChannels.filter((currentChannel) => currentChannel !== channel);
       }
-
       return [...nextChannels, channel];
     });
   }
 
-  function saveWatch() {
+  async function saveWatch() {
     const nextChannels = channels.length === 0 ? defaultChannels : channels;
     const nextSavedAt = new Date().toISOString();
     const existing = readStoredWatches().filter((watch) => watch.targetId !== targetId);
@@ -134,21 +160,57 @@ export function WatchSubscriptionPanel({
 
     setDraftCadence(null);
     setDraftChannels(null);
+    setSyncNote(null);
+
+    if (loggedIn) {
+      const response = await fetch("/api/konto/watches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          authorityId,
+          cadence,
+          alertsEnabled: nextChannels.includes("email"),
+        }),
+      });
+
+      if (response.ok) {
+        const data = (await response.json()) as { watch?: ServerWatch };
+        if (data.watch) {
+          setServerWatch({
+            id: data.watch.id,
+            authorityId: data.watch.authorityId,
+            authorityName: targetName,
+            cadence,
+            updatedAt: nextSavedAt,
+          });
+        }
+        setSyncNote("Bevakningen sparades på ditt konto.");
+      } else {
+        setSyncNote("Lokal bevakning sparad. Servern kunde inte synkas just nu.");
+      }
+    }
   }
 
-  function removeWatch() {
+  async function removeWatch() {
     writeStoredWatches(readStoredWatches().filter((watch) => watch.targetId !== targetId));
     setDraftCadence(null);
     setDraftChannels(null);
+
+    if (loggedIn && serverWatch) {
+      await fetch(`/api/konto/watches/${serverWatch.id}`, { method: "DELETE" });
+      setServerWatch(null);
+    }
   }
 
   return (
     <aside className="surface-strong rounded-4xl p-6 md:p-7">
-      <p className="eyebrow">Watch</p>
+      <p className="eyebrow">Bevakning</p>
       <h2 className="mt-3 font-title text-3xl">Bevaka {targetName}</h2>
       <p className="mt-3 text-(--muted) text-sm leading-7">{note}</p>
       <p className="mt-2 text-(--muted) text-xs leading-6">
-        Sparas lokalt i webbläsaren tills serverpersistens för bevakningar kopplas in. Endast notifieringar om nya offentliga poster och verifierade korrelationer ingår.
+        {loggedIn
+          ? "Synkas till ditt konto när du sparar. Endast notifieringar om nya offentliga poster och verifierade korrelationer ingår."
+          : "Sparas lokalt i webbläsaren. Logga in för att synka bevakningen till ditt konto."}
       </p>
 
       <div className="mt-6 grid gap-4">
@@ -168,7 +230,6 @@ export function WatchSubscriptionPanel({
           <div className="mt-3 flex flex-wrap gap-2">
             {(Object.keys(channelLabels) as WatchChannel[]).map((channel) => {
               const checked = channels.includes(channel);
-
               return (
                 <label
                   className={`inline-flex cursor-pointer items-center gap-2 rounded-full border px-3 py-2 text-sm transition ${checked ? "border-[rgba(15,118,110,0.36)] bg-[rgba(15,118,110,0.12)]" : "border-[rgba(22,32,42,0.12)] bg-white/70"}`}
@@ -184,11 +245,11 @@ export function WatchSubscriptionPanel({
       </div>
 
       <div className="mt-6 flex flex-wrap gap-3">
-        <button className="btn-primary" onClick={saveWatch} type="button">
+        <button className="btn-primary" onClick={() => void saveWatch()} type="button">
           {isActive ? "Uppdatera bevakning" : "Starta bevakning"}
         </button>
         {isActive ? (
-          <button className="btn-secondary" onClick={removeWatch} type="button">
+          <button className="btn-secondary" onClick={() => void removeWatch()} type="button">
             Avsluta bevakning
           </button>
         ) : null}
@@ -200,9 +261,10 @@ export function WatchSubscriptionPanel({
           {isActive
             ? savedAt
               ? `Senast sparad ${new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(savedAt))}.`
-              : "Bevakningen är aktiv och synkas lokalt i webbläsaren."
+              : "Bevakningen är aktiv."
             : "Välj frekvens och kanaler för att få notiser om nya offentliga poster, beslut och korrelationer."}
         </p>
+        {syncNote ? <p className="mt-2 text-xs text-(--muted)">{syncNote}</p> : null}
       </div>
     </aside>
   );

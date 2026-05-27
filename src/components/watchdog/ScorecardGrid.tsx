@@ -1,4 +1,4 @@
-import { AuthorityScorecardView } from "@/lib/public-insights";
+import type { AuthorityScorecardView } from "@/lib/public-insights";
 
 type ScorecardGridProps = {
   items: AuthorityScorecardView[];

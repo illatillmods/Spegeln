@@ -222,7 +222,7 @@ export function getPublicApiSpec(baseUrl: string) {
       "/register": {
         post: {
           summary: "Registrera en publik API-konsument",
-          description: "Standardregistrering för anonymiserade endpoints. Premium-access och bulkdata kräver separat kommersiell och juridisk granskning.",
+          description: "Standardregistrering för anonymiserade endpoints. Premium-access och bulkdata öppnar tyngre flöden för redaktioner, partnerpaneler och egna verktyg.",
           requestBody: {
             required: true,
             content: {

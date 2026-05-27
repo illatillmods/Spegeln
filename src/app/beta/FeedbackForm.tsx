@@ -55,7 +55,7 @@ export function FeedbackForm({ locale, defaultEmail }: FeedbackFormProps) {
           <option value="beta">{locale === "en" ? "Beta feedback" : "Betafeedback"}</option>
           <option value="ux">UX</option>
           <option value="bug">Bug</option>
-          <option value="legal">{locale === "en" ? "Legal review" : "Juridisk granskning"}</option>
+          <option value="legal">{locale === "en" ? "Hard blocker" : "Skarp blockerare"}</option>
         </select>
       </div>
       <div className="mt-4">

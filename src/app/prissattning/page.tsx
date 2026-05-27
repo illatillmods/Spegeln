@@ -15,7 +15,7 @@ const toneClasses = {
 
 export const metadata: Metadata = {
   title: "Prissättning",
-  description: "Freemium, premium, pay-per-use och etiska annonser för Spegeln.",
+  description: "Fri insyn, premiumverktyg, usage-priser och sponsrat mottryck för Spegeln.",
 };
 
 export default function PricingPage() {
@@ -25,18 +25,18 @@ export default function PricingPage() {
     <div className="shell space-y-20 pb-20 pt-10 md:pt-14">
       <section className="grid gap-8 lg:grid-cols-[1fr_0.9fr] lg:items-start">
         <div className="space-y-5 reveal">
-          <p className="eyebrow">Intäktsmodell</p>
+          <p className="eyebrow">Finansiering</p>
           <h1 className="max-w-3xl font-title text-5xl leading-none sm:text-6xl">
-            Bygg räckvidd med fri insyn och ta betalt för fart, djup och arbetsflöde.
+            Fri insyn först. Betalvägg först när du vill skruva upp trycket.
           </h1>
           <p className="max-w-2xl text-(--muted) text-lg leading-8">
-            Spegeln bör tjäna pengar på nytta, inte på att låsa in samhällsinformation. Därför kombinerar produkten gratisnivå, abonnemang, usage-priser och tydligt reglerad annonsering.
+            Spegeln tjänar pengar på kraft, fart och tyngre verktyg, inte på att låsa in det som behövs för att se systemfel. Därför kombinerar produkten gratisnivå, abonnemang, usage-priser och sponsrat mottryck.
           </p>
         </div>
 
         <article className="surface-strong rounded-4xl p-6 md:p-8 reveal" style={{ animationDelay: "120ms" }}>
-          <p className="eyebrow">Kommersiell princip</p>
-          <h2 className="mt-3 font-title text-4xl">Ingen intäktskanal får urholka oberoendet.</h2>
+          <p className="eyebrow">Så finansieras trycket</p>
+          <h2 className="mt-3 font-title text-4xl">Intäkterna ska göra plattformen råare, snabbare och svårare att ignorera.</h2>
           <div className="mt-6 space-y-4">
             {monetizationChannels.map((channel) => (
               <div className={`rounded-3xl border border-[rgba(22,32,42,0.08)] p-5 ${toneClasses[channel.tone]}`} key={channel.title}>
@@ -95,7 +95,7 @@ export default function PricingPage() {
           </article>
           <article className="rounded-3xl border border-[rgba(194,107,20,0.35)] bg-[rgba(248,227,197,0.88)] p-5">
             <p className="eyebrow">Kontanter</p>
-            <p className="mt-2 text-sm leading-7 text-(--foreground)">Kontant betalning är markerad tydligt och ger 50% rabatt, men kräver laglig dokumentation, manuell verifiering och legal review före aktivering.</p>
+            <p className="mt-2 text-sm leading-7 text-(--foreground)">Kontant betalning ger 50% rabatt och aktiveras manuellt när betalningen väl är bekräftad.</p>
           </article>
         </div>
       </section>
@@ -103,29 +103,29 @@ export default function PricingPage() {
       <section className="grid gap-4 lg:grid-cols-[0.92fr_1.08fr]">
         <article className="surface rounded-4xl p-6 md:p-8 reveal">
           <p className="eyebrow">Pay-per-use</p>
-          <h2 className="mt-3 font-title text-4xl">Prissätt de tunga funktionerna separat.</h2>
+          <h2 className="mt-3 font-title text-4xl">Prissätt de tunga funktionerna utan att slå igen porten.</h2>
           <p className="mt-4 text-(--muted) text-sm leading-7">
             Sätt usage-pris på sådant som faktiskt skapar marginalkostnad: AI-sammanfattningar, batch-exporter, historiska jämförelser, större dokumentomvandlingar och myndighetsbatcher i Byråkrati-bombaren.
           </p>
           <ul className="text-(--foreground) mt-6 space-y-4 text-sm leading-7">
             <li className="flex gap-3">
               <span className="signal-dot mt-2 shrink-0" />
-              <span>Använd usage-priser för att undvika att gratis- eller lågprisplaner subventionerar tung beräkning.</span>
+              <span>Använd usage-priser för att låta gratisnivån vara öppen medan tung beräkning betalar sin egen tyngd.</span>
             </li>
             <li className="flex gap-3">
               <span className="signal-dot mt-2 shrink-0" />
-              <span>Gör priset transparent per körning eller per export, så att användaren vet vad som kostar innan jobbet startar.</span>
+              <span>Gör priset transparent per körning eller export så att användaren vet när nästa tryckpunkt kostar mer.</span>
             </li>
             <li className="flex gap-3">
               <span className="signal-dot mt-2 shrink-0" />
-              <span>Massutskick kan prissättas per batch och mottagare, medan Pro-planen låser upp obegränsade körningar inom abuse-gränser.</span>
+              <span>Massutskick kan prissättas per batch och mottagare, medan Pro-planen låser upp obegränsade körningar inom plattformens tempogränser.</span>
             </li>
           </ul>
         </article>
 
         <article className="surface rounded-4xl p-6 md:p-8 reveal" style={{ animationDelay: "120ms" }}>
-          <p className="eyebrow">Etisk annonsering</p>
-          <h2 className="mt-3 font-title text-4xl">Annonsytor kan fungera om de hålls i koppel.</h2>
+          <p className="eyebrow">Sponsrat mottryck</p>
+          <h2 className="mt-3 font-title text-4xl">Sponsorer får stärka verktygen, aldrig tona ned budskapet.</h2>
           <ul className="text-(--foreground) mt-6 space-y-4 text-sm leading-7">
             {ethicalAdRules.map((rule) => (
               <li className="flex gap-3" key={rule}>

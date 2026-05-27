@@ -1,3 +1,13 @@
+export { getWikiPageBySlug } from "@/lib/civic/wiki";
+export { getAccountOverview, deleteUserWatch, listUserWatches, upsertUserWatch } from "@/lib/civic/account";
+export { getTaxAnalysisById, listTaxAnalyses, saveTaxAnalysis } from "@/lib/civic/tax-analyses";
+export {
+  createReverseSurveillanceSubmission,
+  getReverseSurveillanceById,
+  listReverseSurveillance,
+  type ReverseSurveillanceInput,
+  type ReverseSurveillanceView,
+} from "@/lib/civic/reverse-surveillance";
 import { createHash } from "node:crypto";
 import {
   AppealArtifactKind,
@@ -7,13 +17,11 @@ import {
   ModerationDecision,
   SeverityLevel,
   TrustVoteDirection,
-  type Prisma,
 } from "@prisma/client";
 import {
   requestAutomatedAppealBundle,
   requestFailureTriage,
   requestPressReleaseDraft,
-  requestReverseSurveillancePlan,
   type AutomatedAppealResult,
   type EvidenceManifest,
 } from "@/lib/ai-worker";
@@ -108,33 +116,6 @@ export type WikiPageView = {
   latestExcerpt: string;
 };
 
-export type ReverseSurveillanceInput = {
-  authorityId?: string;
-  officialId?: string;
-  title: string;
-  summary: string;
-  anonymousAlias?: string;
-  countryCode?: string;
-  regionCode?: string;
-  evidence: EvidenceAssetInput[];
-};
-
-export type ReverseSurveillanceView = {
-  id: string;
-  title: string;
-  summary: string;
-  authorityName?: string;
-  authorityCategory?: string;
-  authoritySlug?: string;
-  officialName?: string;
-  redactionStatus: string;
-  redactionPolicy: string;
-  riskSummary: string;
-  socialCaption: string;
-  lifecycleStatus: string;
-  createdAt: string;
-};
-
 export type AutomatedAppealInput = {
   authorityId?: string;
   officialId?: string;
@@ -178,77 +159,6 @@ type ActorContext = {
   ipAddress?: string | null;
 };
 
-const fallbackFailureReports: FailureReportView[] = [
-  {
-    id: "demo-failure-1",
-    title: "Felaktig sekretessprövning i kommunalt ärende",
-    summary: "Anonym rapport om återkommande avslag på handlingar utan tydlig motivering.",
-    authorityName: "Stockholms stad",
-    anonymousAlias: "Källa-NORR",
-    aiSeverity: "HIGH",
-    aiPriorityScore: 81,
-    aiSummary: "Mönstret tyder på ett systematiskt problem i handläggningen.",
-    lifecycleStatus: "LEGAL_REVIEW",
-    pressReleaseDraft: "## Pressutkast\n\nEtt nytt granskningsärende rörande möjlig felaktig sekretessprövning är under juridisk bedömning.",
-    evidenceCount: 3,
-    createdAt: new Date().toISOString(),
-  },
-];
-
-const fallbackConfidenceBoard: ConfidenceBoardEntry[] = [
-  {
-    targetId: "official-1",
-    targetLabel: "Anna Andersson, Polismyndigheten",
-    kind: "official",
-    confidenceScore: 42,
-    upvotes: 18,
-    downvotes: 25,
-    testimonials: 7,
-    trend: -6,
-  },
-  {
-    targetId: "authority-1",
-    targetLabel: "Försäkringskassan",
-    kind: "authority",
-    confidenceScore: 54,
-    upvotes: 31,
-    downvotes: 26,
-    testimonials: 12,
-    trend: 4,
-  },
-];
-
-const fallbackWikiPages: WikiPageView[] = [
-  {
-    id: "wiki-1",
-    slug: "overklaga-sekretess-avslag",
-    title: "Överklaga sekretessavslag",
-    summary: "Praktiska steg för att begära motivering, få ut beslutsunderlag och gå vidare till domstol.",
-    category: "offentlighetsprincipen",
-    tags: ["sekretess", "överklagande", "diarium"],
-    score: 14,
-    revisionCount: 3,
-    latestExcerpt: "Begär alltid skriftlig motivering och diarienummer innan nästa steg.",
-  },
-];
-
-const fallbackReverseSubmissions: ReverseSurveillanceView[] = [
-  {
-    id: "video-1",
-    title: "Videobevis från ingripande vid tunnelbanan",
-    summary: "Material i kö för verifiering, maskning av tredje man och juridisk granskning.",
-    authorityName: "Polismyndigheten",
-    redactionStatus: "PROCESSING",
-    redactionPolicy: "Bystanders and sensitive persons blurred by default. Public officials require legal review before de-identification is lifted.",
-    riskSummary: "Delning stoppad tills redaktions- och juristkontroll är slutförd.",
-    socialCaption: "Nytt videomaterial inkommet. Publicering sker först efter verifiering och skydd av tredje man.",
-    lifecycleStatus: "LEGAL_REVIEW",
-    createdAt: new Date().toISOString(),
-  },
-];
-
-const fallbackAutomatedAppeals: AutomatedAppealView[] = [];
-
 function hashFingerprint(source?: string | null) {
   if (!source) {
     return null;
@@ -267,6 +177,14 @@ function normalizeArray(values: string[] | undefined) {
 
 function toAssetKind(kind: EvidenceAssetInput["assetKind"]) {
   return EvidenceAssetKind[kind];
+}
+
+function resolveEvidenceStorageKey(asset: EvidenceAssetInput, index: number, prefix: string) {
+  if (asset.storageKey) {
+    return asset.storageKey;
+  }
+
+  return `pending://${prefix}/${Date.now()}-${index}-${asset.fileName}`;
 }
 
 function severityFromAi(value: string) {
@@ -310,7 +228,7 @@ function mapFailureReport(record: {
 export async function listAuthorityFailureReports(limit = 6): Promise<FailureReportView[]> {
   const prisma = getPrismaClient();
   if (!prisma) {
-    return fallbackFailureReports;
+    return [];
   }
 
   const records = await prisma.authorityFailureReport.findMany({
@@ -332,11 +250,34 @@ export async function listAuthorityFailureReports(limit = 6): Promise<FailureRep
   return records.map(mapFailureReport);
 }
 
+export async function getAuthorityFailureReportById(id: string): Promise<FailureReportView | null> {
+  const prisma = getPrismaClient();
+  if (!prisma) {
+    return null;
+  }
+
+  const record = await prisma.authorityFailureReport.findUnique({
+    where: { id },
+    include: {
+      authority: { select: { name: true, category: true, slug: true } },
+      official: { select: { fullName: true } },
+      evidenceAssets: { select: { id: true } },
+    },
+  });
+
+  return record ? mapFailureReport(record) : null;
+}
+
 export async function createAuthorityFailureReport(input: FailureReportInput, actor: ActorContext): Promise<FailureReportView> {
   const title = normalizeText(input.title, 160);
   const summary = normalizeText(input.summary, 4000);
   if (!title || !summary) {
     throw new Error("Titel och sammanfattning krävs.");
+  }
+
+  const prisma = getPrismaClient();
+  if (!prisma) {
+    throw new Error("DATABASE_URL saknas. Granskningsärenden kräver databaspersistens.");
   }
 
   const triage = await requestFailureTriage({
@@ -352,21 +293,6 @@ export async function createAuthorityFailureReport(input: FailureReportInput, ac
     severity: triage.severity,
     locale: "sv-SE",
   });
-
-  const prisma = getPrismaClient();
-  if (!prisma) {
-    return {
-      ...fallbackFailureReports[0],
-      title,
-      summary,
-      anonymousAlias: input.anonymousAlias,
-      aiSeverity: triage.severity,
-      aiPriorityScore: triage.priorityScore,
-      aiSummary: triage.summary,
-      pressReleaseDraft: pressRelease.bodyMarkdown,
-      evidenceCount: input.evidence.length,
-    };
-  }
 
   const record = await prisma.authorityFailureReport.create({
     data: {
@@ -393,7 +319,7 @@ export async function createAuthorityFailureReport(input: FailureReportInput, ac
           fileName: normalizeText(asset.fileName, 180),
           mimeType: normalizeText(asset.mimeType, 140),
           byteSize: asset.byteSize,
-          storageKey: `pending://failure/${Date.now()}-${index}-${asset.fileName}`,
+          storageKey: resolveEvidenceStorageKey(asset, index, "failure"),
           extractedText: asset.extractedText?.slice(0, 5000),
         })),
       },
@@ -417,7 +343,7 @@ export async function createAuthorityFailureReport(input: FailureReportInput, ac
 export async function getConfidenceBoard(limit = 10): Promise<ConfidenceBoardEntry[]> {
   const prisma = getPrismaClient();
   if (!prisma) {
-    return fallbackConfidenceBoard;
+    return [];
   }
 
   const [votes, testimonials] = await Promise.all([
@@ -513,7 +439,7 @@ export async function getConfidenceBoard(limit = 10): Promise<ConfidenceBoardEnt
 export async function submitConfidenceVote(input: ConfidenceVoteInput, actor: ActorContext) {
   const prisma = getPrismaClient();
   if (!prisma) {
-    return { ok: true };
+    throw new Error("DATABASE_URL saknas. Röster kräver databaspersistens.");
   }
 
   await prisma.officialConfidenceVote.create({
@@ -535,7 +461,7 @@ export async function submitConfidenceVote(input: ConfidenceVoteInput, actor: Ac
 export async function submitConfidenceTestimonial(input: ConfidenceTestimonialInput, actor: ActorContext) {
   const prisma = getPrismaClient();
   if (!prisma) {
-    return { ok: true };
+    throw new Error("DATABASE_URL saknas. Vittnesmål kräver databaspersistens.");
   }
 
   await prisma.confidenceTestimonial.create({
@@ -558,7 +484,7 @@ export async function submitConfidenceTestimonial(input: ConfidenceTestimonialIn
 export async function listWikiPages(limit = 10): Promise<WikiPageView[]> {
   const prisma = getPrismaClient();
   if (!prisma) {
-    return fallbackWikiPages;
+    return [];
   }
 
   const pages = await prisma.loopholeWikiPage.findMany({
@@ -592,7 +518,7 @@ export async function listWikiPages(limit = 10): Promise<WikiPageView[]> {
 export async function createWikiDraft(input: WikiDraftInput, actor: ActorContext) {
   const prisma = getPrismaClient();
   if (!prisma) {
-    return { ok: true };
+    throw new Error("DATABASE_URL saknas. Wikiutkast kräver databaspersistens.");
   }
 
   const slug = normalizeText(input.slug, 80)
@@ -634,123 +560,6 @@ export async function createWikiDraft(input: WikiDraftInput, actor: ActorContext
   return { ok: true };
 }
 
-export async function listReverseSurveillance(limit = 6): Promise<ReverseSurveillanceView[]> {
-  const prisma = getPrismaClient();
-  if (!prisma) {
-    return fallbackReverseSubmissions;
-  }
-
-  const records = await prisma.reverseSurveillanceSubmission.findMany({
-    include: {
-      authority: { select: { name: true, category: true, slug: true } },
-      official: { select: { fullName: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-  });
-
-  return records.map((record) => {
-    const sharePack = record.sharePack as Prisma.JsonObject | null;
-    return {
-      id: record.id,
-      title: record.title,
-      summary: record.summary,
-      authorityName: record.authority?.name || undefined,
-      authorityCategory: record.authority?.category || undefined,
-      authoritySlug: record.authority?.slug || undefined,
-      officialName: record.official?.fullName || undefined,
-      redactionStatus: record.redactionStatus,
-      redactionPolicy: record.redactionPolicy,
-      riskSummary: typeof sharePack?.riskSummary === "string" ? sharePack.riskSummary : "Manuell verifiering krävs innan delning.",
-      socialCaption: typeof sharePack?.socialCaption === "string" ? sharePack.socialCaption : "Nytt material i verifieringskön.",
-      lifecycleStatus: record.lifecycleStatus,
-      createdAt: record.createdAt.toISOString(),
-    } satisfies ReverseSurveillanceView;
-  });
-}
-
-export async function createReverseSurveillanceSubmission(input: ReverseSurveillanceInput, actor: ActorContext): Promise<ReverseSurveillanceView> {
-  const title = normalizeText(input.title, 160);
-  const summary = normalizeText(input.summary, 4000);
-  const plan = await requestReverseSurveillancePlan({
-    title,
-    summary,
-    locale: "sv-SE",
-    evidence: input.evidence,
-  });
-
-  const prisma = getPrismaClient();
-  if (!prisma) {
-    return {
-      ...fallbackReverseSubmissions[0],
-      title,
-      summary,
-      redactionPolicy: plan.redactionPolicy,
-      riskSummary: plan.riskSummary,
-      socialCaption: plan.sharePack.socialCaption,
-    };
-  }
-
-  const record = await prisma.reverseSurveillanceSubmission.create({
-    data: {
-      authorityId: input.authorityId,
-      officialId: input.officialId,
-      countryCode: input.countryCode || "SE",
-      regionCode: input.regionCode || null,
-      anonymousAlias: normalizeText(input.anonymousAlias, 80) || null,
-      uploaderFingerprintHash: hashFingerprint(actor.fingerprintSource),
-      title,
-      summary,
-      lifecycleStatus: IntakeLifecycleStatus.LEGAL_REVIEW,
-      redactionStatus: "PROCESSING",
-      redactionPolicy: plan.redactionPolicy,
-      sharePack: {
-        riskSummary: plan.riskSummary,
-        socialCaption: plan.sharePack.socialCaption,
-        pressHeadline: plan.sharePack.pressHeadline,
-        alertText: plan.sharePack.alertText,
-      },
-      evidenceAssets: {
-        create: input.evidence.map((asset, index) => ({
-          assetKind: toAssetKind(asset.assetKind),
-          fileName: normalizeText(asset.fileName, 180),
-          mimeType: normalizeText(asset.mimeType, 140),
-          byteSize: asset.byteSize,
-          storageKey: `pending://reverse/${Date.now()}-${index}-${asset.fileName}`,
-          extractedText: asset.extractedText?.slice(0, 5000),
-          redactionStatus: asset.assetKind === "VIDEO" ? "PROCESSING" : null,
-        })),
-      },
-      reviewItems: {
-        create: {
-          targetType: "reverse_surveillance_submission",
-          status: IntakeLifecycleStatus.LEGAL_REVIEW,
-        },
-      },
-    },
-    include: {
-      authority: { select: { name: true, category: true, slug: true } },
-      official: { select: { fullName: true } },
-    },
-  });
-
-  return {
-    id: record.id,
-    title: record.title,
-    summary: record.summary,
-    authorityName: record.authority?.name || undefined,
-    authorityCategory: record.authority?.category || undefined,
-    authoritySlug: record.authority?.slug || undefined,
-    officialName: record.official?.fullName || undefined,
-    redactionStatus: record.redactionStatus,
-    redactionPolicy: record.redactionPolicy,
-    riskSummary: plan.riskSummary,
-    socialCaption: plan.sharePack.socialCaption,
-    lifecycleStatus: record.lifecycleStatus,
-    createdAt: record.createdAt.toISOString(),
-  };
-}
-
 function choosePrimaryArtifact(bundle: AutomatedAppealResult) {
   return bundle.artifacts[0];
 }
@@ -762,7 +571,7 @@ function artifactKindFromAi(kind: AutomatedAppealResult["artifacts"][number]["ki
 export async function listAutomatedAppealJobs(limit = 6): Promise<AutomatedAppealView[]> {
   const prisma = getPrismaClient();
   if (!prisma) {
-    return fallbackAutomatedAppeals;
+    return [];
   }
 
   const records = await prisma.automatedAppealJob.findMany({
@@ -800,32 +609,17 @@ export async function createAutomatedAppealJob(input: AutomatedAppealInput, acto
     throw new Error("Beslutstitel och sammanfattning krävs.");
   }
 
+  const prisma = getPrismaClient();
+  if (!prisma) {
+    throw new Error("DATABASE_URL saknas. Automatiserade överklaganden kräver databaspersistens.");
+  }
+
   const bundle = await requestAutomatedAppealBundle({
     sourceTitle,
     sourceSummary,
     locale: input.locale || "sv-SE",
     countryCode: input.countryCode || "SE",
   });
-
-  const prisma = getPrismaClient();
-  if (!prisma) {
-    return {
-      id: `draft-${Date.now()}`,
-      sourceTitle,
-      parsedDecisionSummary: bundle.parsedDecisionSummary,
-      riskSummary: bundle.riskSummary,
-      status: AppealAutomationStatus.DRAFTED,
-      artifactCount: bundle.artifacts.length,
-      createdAt: new Date().toISOString(),
-      artifacts: bundle.artifacts.map((artifact, index) => ({
-        id: `artifact-${index}`,
-        kind: artifact.kind,
-        title: artifact.title,
-        subjectLine: artifact.subjectLine,
-        body: artifact.body,
-      })),
-    };
-  }
 
   let batchId: string | undefined;
 
@@ -880,7 +674,7 @@ export async function createAutomatedAppealJob(input: AutomatedAppealInput, acto
           fileName: normalizeText(asset.fileName, 180),
           mimeType: normalizeText(asset.mimeType, 140),
           byteSize: asset.byteSize,
-          storageKey: `pending://appeals/${Date.now()}-${index}-${asset.fileName}`,
+          storageKey: resolveEvidenceStorageKey(asset, index, "appeals"),
           extractedText: asset.extractedText?.slice(0, 5000),
         })),
       },

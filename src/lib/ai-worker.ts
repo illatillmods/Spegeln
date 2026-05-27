@@ -28,6 +28,7 @@ export type EvidenceManifest = {
   byteSize: number;
   assetKind: "TEXT" | "IMAGE" | "DOCUMENT" | "VIDEO" | "AUDIO";
   extractedText?: string;
+  storageKey?: string;
 };
 
 export type FailureTriageInput = {
@@ -96,39 +97,177 @@ export type AutomatedAppealResult = {
   artifacts: AutomatedAppealArtifact[];
 };
 
-const defaultResult: TaxOptimizationResult = {
-  summary: "Ingen AI-worker är konfigurerad ännu. Sätt AI_WORKER_URL och AI_WORKER_SHARED_SECRET för att aktivera legal-only analys.",
-  strategies: [
-    {
-      title: "ROT- och RUT-avdrag",
-      description: "Kontrollera om planerade hushålls- och renoveringskostnader kan fördelas för att nyttja tillgängliga avdrag fullt ut inom gällande regler.",
-      legal: true,
-      legalBasis: "Inkomstskattelagen och Skatteverkets vägledning om hushållsnära tjänster.",
-      estimatedImpactSek: 5000,
-      priority: "medium",
-    },
-    {
-      title: "ISK kontra traditionell depå",
-      description: "Jämför schablonbeskattning mot kapitalvinstbeskattning utifrån sparhorisont, omsättning och förväntad avkastning.",
-      legal: true,
-      legalBasis: "Reglerna för investeringssparkonto och kapitalbeskattning i Sverige.",
-      estimatedImpactSek: 3500,
-      priority: "medium",
-    },
-  ],
-  disclaimer: "Endast dokumenterade lagliga strategier. Ingen rådgivning om skatteundandragande, falska avdrag eller dolda upplägg.",
-  premium: true,
+export type WorkerHealthResult = {
+  status: "ok";
+  service: string;
+  provider: "model_backed" | "rules_based";
+  model: string | null;
+  supportedJobs: string[];
 };
 
-async function callWorker<TRequest, TResponse>(path: string, payload: TRequest, fallback: TResponse): Promise<TResponse> {
-  const workerUrl = process.env.AI_WORKER_URL;
-  const sharedSecret = process.env.AI_WORKER_SHARED_SECRET;
+export type WorkerTextInput = {
+  text: string;
+  locale?: string;
+  countryCode?: string;
+};
 
-  if (!workerUrl || !sharedSecret) {
-    return fallback;
+export type DocumentClassificationResult = {
+  labels: string[];
+  confidence: number;
+};
+
+export type EntityExtractionResult = {
+  organizations: string[];
+  dates: string[];
+  caseNumbers: string[];
+  emails: string[];
+};
+
+export type TextSummaryResult = {
+  summary: string;
+  sentencesUsed: number;
+  keyPoints: string[];
+};
+
+export type TextEmbeddingResult = {
+  embedding: number[];
+  dimensions: number;
+};
+
+export type AnomalyDetectionInput = {
+  values: number[];
+  baselineLabel?: string;
+};
+
+export type AnomalyDetectionResult = {
+  baselineLabel: string;
+  anomalies: Array<{
+    index: number;
+    value: number;
+    zScore: number;
+  }>;
+  mean: number;
+  stddev: number;
+};
+
+type RawWorkerHealthResult = {
+  status?: string;
+  service?: string;
+  provider?: string;
+  model?: string | null;
+  supportedJobs?: string[];
+};
+
+type RawEntityExtractionResult = {
+  organizations?: string[];
+  dates?: string[];
+  case_numbers?: string[];
+  emails?: string[];
+};
+
+type RawTextSummaryResult = {
+  summary?: string;
+  sentences_used?: number;
+  key_points?: string[];
+};
+
+type RawAnomalyDetectionResult = {
+  baseline_label?: string;
+  anomalies?: Array<{
+    index?: number;
+    value?: number;
+    z_score?: number;
+  }>;
+  mean?: number;
+  stddev?: number;
+};
+
+const supportedJobs = [
+  "tax.optimize",
+  "watchdog.triage_case",
+  "watchdog.generate_press_release",
+  "watchdog.reverse_surveillance",
+  "appeals.generate_bundle",
+  "nlp.classify_document",
+  "nlp.extract_entities",
+  "nlp.summarize",
+  "nlp.embed",
+  "nlp.detect_anomalies",
+] as const;
+
+function getWorkerBridgeConfig() {
+  return {
+    workerUrl: process.env.AI_WORKER_URL?.replace(/\/$/, ""),
+    sharedSecret: process.env.AI_WORKER_SHARED_SECRET,
+  };
+}
+
+function getRequiredWorkerBridgeConfig() {
+  const { workerUrl, sharedSecret } = getWorkerBridgeConfig();
+
+  if (!workerUrl) {
+    throw new Error("AI_WORKER_URL saknas. AI-funktionerna kräver en konfigurerad worker.");
   }
 
-  const response = await fetch(`${workerUrl.replace(/\/$/, "")}${path}`, {
+  if (!sharedSecret) {
+    throw new Error("AI_WORKER_SHARED_SECRET saknas. AI-funktionerna kräver en signerad worker-anslutning.");
+  }
+
+  return { workerUrl, sharedSecret };
+}
+
+function dedupeStrings(values: string[] | undefined) {
+  return Array.from(new Set((values || []).map((value) => value.trim()).filter(Boolean)));
+}
+
+function normalizeWorkerHealth(payload: RawWorkerHealthResult): WorkerHealthResult {
+  return {
+    status: "ok",
+    service: typeof payload.service === "string" ? payload.service : "spegeln-ai-worker",
+    provider: payload.provider === "model_backed" ? "model_backed" : "rules_based",
+    model: typeof payload.model === "string" ? payload.model : null,
+    supportedJobs: Array.isArray(payload.supportedJobs) && payload.supportedJobs.length > 0 ? payload.supportedJobs : [...supportedJobs],
+  };
+}
+
+function normalizeEntityExtraction(payload: RawEntityExtractionResult): EntityExtractionResult {
+  return {
+    organizations: dedupeStrings(payload.organizations),
+    dates: dedupeStrings(payload.dates),
+    caseNumbers: dedupeStrings(payload.case_numbers),
+    emails: dedupeStrings(payload.emails),
+  };
+}
+
+function normalizeTextSummary(payload: RawTextSummaryResult): TextSummaryResult {
+  return {
+    summary: typeof payload.summary === "string" ? payload.summary : "",
+    sentencesUsed: typeof payload.sentences_used === "number" ? payload.sentences_used : 0,
+    keyPoints: dedupeStrings(payload.key_points),
+  };
+}
+
+function normalizeAnomalyDetection(payload: RawAnomalyDetectionResult): AnomalyDetectionResult {
+  return {
+    baselineLabel: typeof payload.baseline_label === "string" ? payload.baseline_label : "dataset",
+    anomalies: Array.isArray(payload.anomalies)
+      ? payload.anomalies
+          .filter((entry) => typeof entry.index === "number" && typeof entry.value === "number" && typeof entry.z_score === "number")
+          .map((entry) => ({
+            index: entry.index as number,
+            value: entry.value as number,
+            zScore: entry.z_score as number,
+          }))
+      : [],
+    mean: typeof payload.mean === "number" ? payload.mean : 0,
+    stddev: typeof payload.stddev === "number" ? payload.stddev : 0,
+  };
+}
+
+async function callWorker<TRequest, TResponse>(path: string, payload: TRequest): Promise<TResponse> {
+  const { workerUrl, sharedSecret } = getRequiredWorkerBridgeConfig();
+
+  const response = await fetch(`${workerUrl}${path}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -146,6 +285,30 @@ async function callWorker<TRequest, TResponse>(path: string, payload: TRequest, 
   return (await response.json()) as TResponse;
 }
 
+async function getWorker<TResponse>(path: string): Promise<TResponse> {
+  const { workerUrl, sharedSecret } = getRequiredWorkerBridgeConfig();
+
+  const response = await fetch(`${workerUrl}${path}`, {
+    method: "GET",
+    headers: {
+      "x-worker-secret": sharedSecret,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`AI-worker svarade med ${response.status}: ${body}`);
+  }
+
+  return (await response.json()) as TResponse;
+}
+
+export async function requestWorkerHealth(): Promise<WorkerHealthResult> {
+  const payload = await getWorker<RawWorkerHealthResult>("/healthz");
+  return normalizeWorkerHealth(payload);
+}
+
 export async function requestTaxOptimization(input: TaxOptimizationInput): Promise<TaxOptimizationResult> {
   return callWorker(
     "/v1/tax/optimize",
@@ -156,8 +319,76 @@ export async function requestTaxOptimization(input: TaxOptimizationInput): Promi
       locale: input.locale || "sv-SE",
       country_code: input.countryCode || "SE",
     },
-    defaultResult,
   );
+}
+
+export async function requestDocumentClassification(input: WorkerTextInput): Promise<DocumentClassificationResult> {
+  return callWorker(
+    "/v1/nlp/classify-document",
+    {
+      text: input.text,
+      locale: input.locale || "sv-SE",
+      country_code: input.countryCode || "SE",
+    },
+  );
+}
+
+export async function requestEntityExtraction(input: WorkerTextInput): Promise<EntityExtractionResult> {
+  const payload = await callWorker<
+    { text: string; locale: string; country_code: string },
+    RawEntityExtractionResult
+  >(
+    "/v1/nlp/extract-entities",
+    {
+      text: input.text,
+      locale: input.locale || "sv-SE",
+      country_code: input.countryCode || "SE",
+    },
+  );
+
+  return normalizeEntityExtraction(payload);
+}
+
+export async function requestTextSummary(input: WorkerTextInput): Promise<TextSummaryResult> {
+  const payload = await callWorker<
+    { text: string; locale: string; country_code: string },
+    RawTextSummaryResult
+  >(
+    "/v1/nlp/summarize",
+    {
+      text: input.text,
+      locale: input.locale || "sv-SE",
+      country_code: input.countryCode || "SE",
+    },
+  );
+
+  return normalizeTextSummary(payload);
+}
+
+export async function requestTextEmbedding(input: WorkerTextInput): Promise<TextEmbeddingResult> {
+  return callWorker(
+    "/v1/nlp/embed",
+    {
+      text: input.text,
+      locale: input.locale || "sv-SE",
+      country_code: input.countryCode || "SE",
+    },
+  );
+}
+
+export async function requestAnomalyDetection(input: AnomalyDetectionInput): Promise<AnomalyDetectionResult> {
+  const payload = await callWorker<
+    { values: number[]; baseline_label: string },
+    RawAnomalyDetectionResult
+  >(
+    "/v1/nlp/detect-anomalies",
+    {
+      values: input.values,
+      baseline_label: input.baselineLabel || "dataset",
+    },
+  );
+
+  return normalizeAnomalyDetection(payload);
 }
 
 export async function requestFailureTriage(input: FailureTriageInput): Promise<FailureTriageResult> {
@@ -169,16 +400,6 @@ export async function requestFailureTriage(input: FailureTriageInput): Promise<F
       locale: input.locale || "sv-SE",
       country_code: input.countryCode || "SE",
       evidence: input.evidence,
-    },
-    {
-      severity: "HIGH",
-      priorityScore: 76,
-      summary: "Underlaget tyder på ett potentiellt allvarligt myndighetsfel som bör gå vidare till moderation och juridisk genomgång innan publicering.",
-      recommendedActions: [
-        "Verifiera händelsedatum och källkedja.",
-        "Begär in kompletterande diarienummer eller beslut om möjligt.",
-        "Skicka ärendet till juridisk kontroll innan publicering.",
-      ],
     },
   );
 }
@@ -192,11 +413,6 @@ export async function requestPressReleaseDraft(input: PressReleaseDraftInput): P
       severity: input.severity,
       locale: input.locale || "sv-SE",
     },
-    {
-      headline: input.title,
-      deck: "Förslag till pressutskick genererat för intern granskning innan eventuell publicering.",
-      bodyMarkdown: `## Sammanfattning\n\n${input.summary}\n\n## Nästa steg\n\nDetta utkast kräver moderator- och juristgranskning innan extern distribution.`,
-    },
   );
 }
 
@@ -209,15 +425,6 @@ export async function requestReverseSurveillancePlan(input: ReverseSurveillanceI
       locale: input.locale || "sv-SE",
       evidence: input.evidence,
     },
-    {
-      redactionPolicy: "Bystanders and sensitive persons blurred by default. Public officials remain subject to legal review before any unmasking or publication.",
-      riskSummary: "Videon bör behandlas som känsligt bevismaterial och kräver redaktionell kontroll innan delning eller publicering.",
-      sharePack: {
-        pressHeadline: input.title,
-        socialCaption: "Nytt verifieringsärende inkommet. Publicering sker först efter moderation, juridisk granskning och skydd av tredje man.",
-        alertText: "Ny videohändelse i bevakningskön. Kräver kontroll av redaktion och jurist.",
-      },
-    },
   );
 }
 
@@ -229,26 +436,6 @@ export async function requestAutomatedAppealBundle(input: AutomatedAppealInput):
       source_summary: input.sourceSummary,
       locale: input.locale || "sv-SE",
       country_code: input.countryCode || "SE",
-    },
-    {
-      parsedDecisionSummary: input.sourceSummary,
-      riskSummary: "Beslutet tyder på ett överklagbart eller kompletteringskrävande ärende. AI-utkastet måste granskas innan inskick.",
-      artifacts: [
-        {
-          kind: "APPEAL",
-          title: `Överklagande av ${input.sourceTitle}`,
-          subjectLine: `Överklagande: ${input.sourceTitle}`,
-          body: `Jag överklagar beslutet ${input.sourceTitle}.\n\nBakgrund:\n${input.sourceSummary}\n\nJag begär omprövning, fullständig motivering och nytt skriftligt beslut.`,
-          suggestedAppealType: "klagomal",
-        },
-        {
-          kind: "DOCUMENT_REQUEST",
-          title: `Begäran om handlingar för ${input.sourceTitle}`,
-          subjectLine: `Begäran om allmän handling: ${input.sourceTitle}`,
-          body: `Jag begär utlämning av samtliga relevanta handlingar, bilagor, interna tjänsteanteckningar och diarienoteringar som ligger till grund för beslutet ${input.sourceTitle}.`,
-          suggestedAppealType: "info",
-        },
-      ],
     },
   );
 }

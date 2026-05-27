@@ -41,7 +41,7 @@ export function SearchDirectory({ individuals, initialQuery = "" }: SearchDirect
 
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-(--muted)">
         <p>{filteredIndividuals.length} profiler matchar aktuell sökning.</p>
-        <p>Alla träffar visar live-signaler, aktiva källfamiljer, publicerade rapporter och öppna alerts.</p>
+        <p>Alla träffar visar verifierad offentlig dokumentation, aktiva källfamiljer, publicerade rapporter och öppna alerts.</p>
       </div>
 
       <ul className="space-y-4">

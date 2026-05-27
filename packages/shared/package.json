@@ -1,0 +1,10 @@
+{
+  "name": "@spegeln/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./disclosure-policy": "./disclosure-policy.ts",
+    "./session-user": "./session-user.ts"
+  }
+}

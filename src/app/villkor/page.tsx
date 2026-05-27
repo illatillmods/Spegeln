@@ -2,34 +2,34 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "Användarvillkor",
-  description: "Användarvillkor, ansvarsbegränsningar och takedown-principer för Spegeln.",
+  description: "Spelregler för deltagare som vill använda Spegeln för att pressa systemet.",
 };
 
 const sections = [
   {
-    title: "1. Plattformens syfte",
+    title: "1. Plattformens riktning",
     body:
-      "Spegeln är ett research-, bevaknings- och publiceringsverktyg med samhällsinriktning. Plattformen är inte juridisk rådgivning och ger inga garantier om att användargenererat eller AI-assisterat material är publiceringsbart utan manuell granskning.",
+      "Spegeln finns för att ifrågasätta myndigheter, spräcka byråkratiska dimridåer och göra maktens spår publika. Den som kliver in här kliver in i en plattform som väljer konflikt med mörkläggning framför neutral fasad.",
   },
   {
-    title: "2. Tillåten användning",
+    title: "2. Verktyg för uppåttryck",
     body:
-      "Du får inte använda tjänsten för trakasserier, doxxing, olagliga massutskick, otillåten personuppgiftsbehandling eller försök att kringgå juridiska och redaktionella spärrar.",
+      "Använd Spegeln för att spåra, dokumentera, batcha och förstärka kritik mot myndigheter, maktcentra och offentliga beslutsmiljöer. Plattformen är inte byggd för att skydda institutioners anseende eller paketera samhällskritik i myndighetsvänligt språk.",
   },
   {
-    title: "3. Moderation och takedown",
+    title: "3. Offentlighet framför bekvämlighet",
     body:
-      "Spegeln förbehåller sig rätten att stoppa, dölja, eskalera eller ta bort material som bedöms olagligt, oproportionerligt, otillräckligt underbyggt eller riskabelt ur integritets- och förtalssynpunkt.",
+      "Material, vittnesmål och dokument kan fångas upp, kopplas ihop och göras synliga för fler. Poängen är att hålla trycket levande, inte att fungera som ett neutralt arkiv som lugnar ner frågorna så fort de blir obekväma.",
   },
   {
-    title: "4. Betalningar och återbetalning",
+    title: "4. Finansiering utan lojalitet",
     body:
-      "Kort och Klarna hanteras i hosted checkout. Swish, kontanter och kryptovalutor går genom manuell verifiering tills extern PSP eller wallet-infrastruktur är färdiggranskad. Rabatter för kontant- och kryptoflöden gäller endast när betalningen kan dokumenteras lagligt och säkert.",
+      "Betalda planer, engångsköp och sponsorstöd ska hålla grävandet igång. Ingen som betalar köper tystnad, inflytande över vad som granskas eller rätt att tona ned sajtens konflikt med makten.",
   },
   {
-    title: "5. Juridisk granskning",
+    title: "5. Din roll i trycket",
     body:
-      "Funktioner som rör publicering, massutskick, personuppgifter och känsligt innehåll ska genomgå regelbunden svensk/EU-rättslig översyn. Konton eller innehåll kan begränsas medan sådan översyn pågår.",
+      "Om du använder Spegeln gör du det för att bidra till mer insyn, mer friktion och fler frågor mot systemet. Plattformen lovar inte mysig konsensus; den lovar verktyg för att pressa på där myndigheter helst vill slippa ljuset.",
   },
 ];
 
@@ -38,9 +38,9 @@ export default function TermsPage() {
     <div className="shell space-y-12 pb-20 pt-10 md:pt-14">
       <section className="max-w-3xl space-y-4 reveal">
         <p className="eyebrow">Avtal</p>
-        <h1 className="font-title text-5xl leading-none sm:text-6xl">Användarvillkor och ansvarsfördelning</h1>
+        <h1 className="font-title text-5xl leading-none sm:text-6xl">Spelregler för folk som vill pressa systemet</h1>
         <p className="text-(--muted) text-lg leading-8">
-          Villkoren nedan kompletterar juridiksidan och integritetscentret. De är skrivna för att göra moderation, takedown, betalning och publiceringsansvar tydligt innan bred lansering.
+          Det här är plattformens spelregler: mer offentlighet, mer friktion, mindre respekt för maktens bekväma språk. Spegeln är till för människor som vill utmana systemet, inte skydda dess självbild.
         </p>
       </section>
 

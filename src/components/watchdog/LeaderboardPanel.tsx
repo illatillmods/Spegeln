@@ -1,4 +1,5 @@
-import { LeaderboardEntry } from "@/lib/public-insights";
+import type { LeaderboardEntry } from "@/lib/public-insights";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 type LeaderboardPanelProps = {
   title: string;
@@ -20,7 +21,10 @@ export function LeaderboardPanel({ title, windowLabel, items }: LeaderboardPanel
         Poängen bygger på klagomål som leder till officiella svar, publicerade granskningar och pseudonymiserade uppvärderingar från andra användare. Inga riktiga namn exponeras publikt.
       </p>
       <div className="mt-6 space-y-3">
-        {items.map((item) => (
+        {items.length === 0 ? (
+          <EmptyState description="Leaderboard fylls när användare får svar på klagomål och publicerar granskningar." title="Ingen leaderboard-data ännu" />
+        ) : (
+          items.map((item) => (
           <article className="grid gap-4 rounded-3xl border border-[rgba(22,32,42,0.08)] bg-white/75 p-4 md:grid-cols-[88px_1fr_180px] md:items-center" key={item.alias}>
             <div>
               <p className="eyebrow">Placering</p>
@@ -37,7 +41,8 @@ export function LeaderboardPanel({ title, windowLabel, items }: LeaderboardPanel
               <p className="mt-1 text-3xl font-semibold">{item.score}</p>
             </div>
           </article>
-        ))}
+          ))
+        )}
       </div>
     </section>
   );
