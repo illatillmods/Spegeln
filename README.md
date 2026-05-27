@@ -62,6 +62,7 @@ Frontend behöver inte egna databas- eller auth-hemligheter för att köra anvä
   - `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`
   - `AI_WORKER_URL`
   - `AI_WORKER_SHARED_SECRET`
+  - `CRON_SECRET`, `WATCHDOG_CONNECTORS`, `RIKSDAG_API_BASE` (watchdog-ingestion, se [docs/driftchecklist.md](docs/driftchecklist.md))
   - `MASS_APPEALS_SMTP_*` och/eller `MASS_APPEALS_SECURE_MAILBOX_*`
 
 ### Railway AI-worker

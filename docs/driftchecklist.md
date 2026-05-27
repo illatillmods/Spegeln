@@ -29,6 +29,31 @@ Start Command: `npm run backend:start`
 | `GOOGLE_CLIENT_ID/SECRET` | Valfritt | Social inloggning |
 | `GITHUB_CLIENT_ID/SECRET` | Valfritt | Social inloggning |
 | `MASS_APPEALS_SMTP_*` | Valfritt | E-postutskick för batcher |
+| `CRON_SECRET` | Ja (automatisk ingestion) | Hemlighet för `POST /api/admin/watchdog/ingest-cron` |
+| `WATCHDOG_CONNECTORS` | Ja (automatisk ingestion) | Kommaseparerade connectors, t.ex. `riksdag,regering,domstol,bolag,upphandling,property,polis-open` |
+| `RIKSDAG_API_BASE` | Rekommenderas | Standard `https://data.riksdagen.se` |
+| `RIKSDAG_TRAVEL_FROM_YEAR` | Valfritt | Startår för reseredovisnings-backfill (standard `2018`) |
+| `INGEST_RATE_LIMIT_MS` | Valfritt | Paus mellan connector-anrop (standard `500`) |
+
+### Migration vid deploy
+
+Backend kör `prisma migrate deploy` vid start om `DATABASE_URL` är satt (`backend/scripts/start.mjs`).
+
+Manuell körning:
+
+```bash
+npx prisma migrate deploy
+```
+
+### Railway cron (daglig ingestion)
+
+Skapa ett Cron-jobb i Railway som kör:
+
+```bash
+./scripts/railway-cron-ingest.sh
+```
+
+Med miljövariabler `BACKEND_URL` och `CRON_SECRET` satta i cron-tjänsten.
 
 ## AI-worker (Railway)
 

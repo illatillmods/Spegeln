@@ -1,9 +1,17 @@
-import { AuthorityCategory, OfficialCategory, PublicRecordCategory, SourceKind } from "@prisma/client";
+import { AuthorityCategory, PublicRecordCategory, SourceKind } from "@prisma/client";
 import type { ConnectorContext, WatchdogConnector } from "@/lib/watchdog/connectors/base";
 import type { NormalizedRecordDraft } from "@/lib/watchdog/records";
 import { sanitizeRecordText } from "@/lib/watchdog/records";
+import { fetchText } from "@/lib/watchdog/connectors/http";
 
 const CONNECTOR_KEY = "polis-open";
+
+const POLICE_FEEDS = [
+  { region: "Nationell", url: "https://polisen.se/om-polisen/pressrum/pressmeddelanden/" },
+  { region: "Stockholm", url: "https://polisen.se/om-polisen/polisomraden/stockholms-lan/aktuellt/pressmeddelanden/" },
+  { region: "Skåne", url: "https://polisen.se/om-polisen/polisomraden/skane/aktuellt/pressmeddelanden/" },
+  { region: "Västra Götaland", url: "https://polisen.se/om-polisen/polisomraden/vastra-gotaland/aktuellt/pressmeddelanden/" },
+];
 
 type PoliceRelease = {
   id: string;
@@ -14,41 +22,33 @@ type PoliceRelease = {
   sourceUrl: string;
 };
 
-async function fetchPoliceReleases(): Promise<PoliceRelease[]> {
-  try {
-    const response = await fetch("https://polisen.se/om-polisen/pressrum/pressmeddelanden/", {
-      headers: { Accept: "text/html" },
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!response.ok) return fallbackReleases();
-    const html = await response.text();
-    const matches = [...html.matchAll(/href="(\/om-polisen\/pressrum\/[^"]+)"[^>]*>([^<]+)</g)].slice(0, 8);
-    if (matches.length === 0) return fallbackReleases();
+async function fetchFeed(url: string, region: string): Promise<PoliceRelease[]> {
+  const html = await fetchText(url);
+  if (!html) return [];
 
-    return matches.map((match, index) => ({
-      id: `polis-${index}`,
-      title: match[2].trim(),
-      summary: `Polismyndighetens pressmeddelande: ${match[2].trim()}`,
+  const releases: PoliceRelease[] = [];
+  const pattern = /href="(\/[^"]*press[^"]*)"[^>]*>([^<]+)</gi;
+  let index = 0;
+
+  for (const match of html.matchAll(pattern)) {
+    const path = match[1];
+    const title = match[2]?.trim();
+    if (!title || title.length < 8) continue;
+    if (title.toLowerCase().includes("pressmeddel")) continue;
+
+    releases.push({
+      id: `${region}-${index}-${path}`,
+      title,
+      summary: `Polismyndighetens pressmeddelande (${region}): ${title}`,
       date: new Date().toISOString().slice(0, 10),
-      region: "Nationell",
-      sourceUrl: `https://polisen.se${match[1]}`,
-    }));
-  } catch {
-    return fallbackReleases();
+      region,
+      sourceUrl: path.startsWith("http") ? path : `https://polisen.se${path}`,
+    });
+    index += 1;
+    if (index >= 10) break;
   }
-}
 
-function fallbackReleases(): PoliceRelease[] {
-  return [
-    {
-      id: "polis-fallback-1",
-      title: "Polisen publicerar tillsynsbeslut",
-      summary: "Polismyndigheten publicerar tillsynsbeslut och pressmeddelande om offentlig verksamhet.",
-      date: "2025-10-15",
-      region: "Stockholm",
-      sourceUrl: "https://polisen.se/om-polisen/pressrum/pressmeddelanden/",
-    },
-  ];
+  return releases;
 }
 
 export const polisOpenConnector: WatchdogConnector = {
@@ -56,7 +56,7 @@ export const polisOpenConnector: WatchdogConnector = {
   label: "Polisen (öppna pressmeddelanden)",
   async run(context: ConnectorContext) {
     const drafts: NormalizedRecordDraft[] = [];
-    const releases = await fetchPoliceReleases();
+    const seen = new Set<string>();
 
     await context.prisma.authority.upsert({
       where: { slug: "polismyndigheten" },
@@ -71,29 +71,26 @@ export const polisOpenConnector: WatchdogConnector = {
       },
     });
 
-    for (const release of releases) {
-      drafts.push({
-        connectorKey: CONNECTOR_KEY,
-        category: PublicRecordCategory.OTHER,
-        title: release.title,
-        summary: sanitizeRecordText(release.summary),
-        occurredAt: new Date(release.date),
-        sourceKind: SourceKind.PUBLIC_REGISTRY,
-        sourceUrl: release.sourceUrl,
-        sourceRecordId: release.id,
-        legalBasis: "Polismyndighetens offentliga pressmeddelanden",
-        payload: {
-          region: release.region,
-          kind: "police_press_release",
-        },
-        officialHint: {
-          fullName: "Polismyndigheten",
-          title: "Offentligt pressmeddelande",
-          authoritySlug: "polismyndigheten",
-          authorityName: "Polismyndigheten",
-          category: OfficialCategory.POLICE,
-        },
-      });
+    for (const feed of POLICE_FEEDS) {
+      const releases = await fetchFeed(feed.url, feed.region);
+      for (const release of releases) {
+        if (seen.has(release.sourceUrl)) continue;
+        seen.add(release.sourceUrl);
+
+        drafts.push({
+          connectorKey: CONNECTOR_KEY,
+          category: PublicRecordCategory.OTHER,
+          title: release.title,
+          summary: sanitizeRecordText(release.summary),
+          occurredAt: new Date(release.date),
+          sourceKind: SourceKind.PUBLIC_REGISTRY,
+          sourceUrl: release.sourceUrl,
+          sourceRecordId: release.id,
+          legalBasis: "Polismyndighetens offentliga pressmeddelanden",
+          payload: { region: release.region, kind: "police_press_release", rawText: release.summary },
+          authorityId: undefined,
+        });
+      }
     }
 
     return drafts;

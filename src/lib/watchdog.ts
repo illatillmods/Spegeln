@@ -3,6 +3,7 @@ import { getPrismaClient } from "@/lib/prisma";
 import {
   buildPublicFactsFromRecords,
   buildRecordDigestsFromRecords,
+  buildRecordSectionsFromRecords,
   buildRelationshipsFromRecords,
   buildTimelineFromRecords,
   buildVerdictsFromRecords,
@@ -178,6 +179,23 @@ export type WatchPublicRecordFeedItem = {
   authoritySlug?: string | null;
 };
 
+export type WatchRecordSectionItem = {
+  id: string;
+  title: string;
+  summary: string;
+  date: string;
+  sourceUrl?: string | null;
+  legalBasis?: string | null;
+  amount?: string;
+};
+
+export type WatchRecordSection = {
+  id: string;
+  label: string;
+  note: string;
+  items: WatchRecordSectionItem[];
+};
+
 export type WatchProfile = {
   id: string;
   fullName: string;
@@ -203,6 +221,7 @@ export type WatchProfile = {
   timeline: WatchTimelineEvent[];
   alerts: WatchAlertItem[];
   recordDigests: WatchRecordDigest[];
+  recordSections: WatchRecordSection[];
   verdicts: WatchVerdict[];
   trust: WatchTrustSnapshot;
   courtTestimonials: WatchCourtTestimonial[];
@@ -641,29 +660,31 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
     return null;
   }
 
-  const [publicRecords, storedRelationships] = await Promise.all([
+  const [publicRecords] = await Promise.all([
     prisma.publicRecord.findMany({
       where: { officialId: id },
       orderBy: [{ occurredAt: "desc" }, { publishedAt: "desc" }],
       take: 60,
     }),
-    prisma.officialRelationship.findMany({
-      where: { fromOfficialId: id },
-      include: {
-        toOfficial: {
-          select: { fullName: true, title: true },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 20,
-    }),
   ]);
 
   await deriveRelationshipsFromRecords(prisma, id, publicRecords);
 
+  const storedRelationships = await prisma.officialRelationship.findMany({
+    where: { fromOfficialId: id },
+    include: {
+      toOfficial: {
+        select: { fullName: true, title: true },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 20,
+  });
+
   const ingestedFacts = buildPublicFactsFromRecords(publicRecords, official);
   const ingestedTimeline = buildTimelineFromRecords(publicRecords);
   const ingestedDigests = buildRecordDigestsFromRecords(publicRecords);
+  const ingestedSections = buildRecordSectionsFromRecords(publicRecords);
   const ingestedVerdicts = buildVerdictsFromRecords(publicRecords);
   const ingestedRelationships = buildRelationshipsFromRecords(storedRelationships, official.fullName);
 
@@ -938,6 +959,7 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
     timeline,
     alerts,
     recordDigests: mergedRecordDigests,
+    recordSections: ingestedSections,
     verdicts: ingestedVerdicts,
     trust,
     courtTestimonials: official.testimonials.map((item) => ({

@@ -1,7 +1,7 @@
 import { getPrismaClient } from "@/lib/prisma";
 import { runWatchdogIngestionFromUrl } from "@/lib/watchdog-ingestion";
 import { runConnector, type ConnectorRunResult, type WatchdogConnector } from "@/lib/watchdog/connectors/base";
-import { riksdagConnector } from "@/lib/watchdog/connectors/riksdag";
+import { buildRiksdagDrafts, riksdagConnector } from "@/lib/watchdog/connectors/riksdag";
 import { regeringConnector } from "@/lib/watchdog/connectors/regering";
 import { domstolConnector } from "@/lib/watchdog/connectors/domstol";
 import { bolagConnector } from "@/lib/watchdog/connectors/bolag";
@@ -44,7 +44,11 @@ function getRateLimitMs() {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 500;
 }
 
-export async function runWatchdogOrchestrator(options?: { connectorKeys?: string[] }) {
+export async function runWatchdogOrchestrator(options?: {
+  connectorKeys?: string[];
+  riksdagTravelFromYear?: number;
+  riksdagTravelToYear?: number;
+}) {
   const prisma = getPrismaClient();
   if (!prisma) {
     return { skipped: true, reason: "DATABASE_URL saknas." };
@@ -56,6 +60,24 @@ export async function runWatchdogOrchestrator(options?: { connectorKeys?: string
     prisma,
     rateLimitMs: getRateLimitMs(),
   };
+
+  if (options?.riksdagTravelFromYear && keys.includes("riksdag")) {
+    const index = connectors.findIndex((connector) => connector.key === "riksdag");
+    if (index >= 0) {
+      connectors[index] = {
+        ...riksdagConnector,
+        async run(ctx) {
+          return buildRiksdagDrafts(
+            {
+              travelFromYear: options.riksdagTravelFromYear,
+              travelToYear: options.riksdagTravelToYear,
+            },
+            ctx.rateLimitMs,
+          ).collect();
+        },
+      };
+    }
+  }
 
   const runs: ConnectorRunResult[] = [];
   let totalCreated = 0;
@@ -92,6 +114,14 @@ export async function runWatchdogOrchestrator(options?: { connectorKeys?: string
     runs,
     legacyImport,
   };
+}
+
+export async function runWatchdogBackfill(fromYear = 2018) {
+  return runWatchdogOrchestrator({
+    connectorKeys: ["riksdag"],
+    riksdagTravelFromYear: fromYear,
+    riksdagTravelToYear: new Date().getFullYear(),
+  });
 }
 
 export async function getIngestRunHistory(limit = 20) {

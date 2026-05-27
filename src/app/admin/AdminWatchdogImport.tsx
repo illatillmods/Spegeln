@@ -112,6 +112,38 @@ export function AdminWatchdogImport() {
     }
   }
 
+  async function handleBackfill() {
+    setIngestPending(true);
+    setResult(null);
+
+    try {
+      const response = await fetch("/api/admin/watchdog/backfill?fromYear=2018", { method: "POST" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Backfill misslyckades.");
+      }
+
+      setResult(`Riksdag-backfill klar: ${data.recordsCreated} nya poster, ${data.recordsSkipped} hoppade över.`);
+      await loadIngestStatus();
+    } catch (error) {
+      setResult(error instanceof Error ? error.message : "Backfill misslyckades.");
+    } finally {
+      setIngestPending(false);
+    }
+  }
+
+  async function handleReviewAction(itemId: string, action: "approve" | "reject") {
+    const response = await fetch(`/api/admin/watchdog/review/${itemId}/${action}`, { method: "POST" });
+    const data = await response.json();
+    if (!response.ok) {
+      setResult(typeof data.error === "string" ? data.error : "Granskning misslyckades.");
+      return;
+    }
+    setResult(action === "approve" ? "Granskningspost godkänd." : "Granskningspost avvisad.");
+    await loadIngestStatus();
+  }
+
   return (
     <div className="space-y-6">
       <section className="surface rounded-4xl p-6 md:p-8">
@@ -129,6 +161,9 @@ export function AdminWatchdogImport() {
           </button>
           <button className="btn-secondary" disabled={ingestPending} onClick={() => void handleIngestRun()} type="button">
             {ingestPending ? "Kör connectors..." : "Kör connector-orkestrator"}
+          </button>
+          <button className="btn-secondary" disabled={ingestPending} onClick={() => void handleBackfill()} type="button">
+            {ingestPending ? "Backfill..." : "Kör Riksdag-backfill (2018–)"}
           </button>
         </div>
         {result ? <p className="mt-4 text-sm leading-7 text-(--muted)">{result}</p> : null}
@@ -187,6 +222,14 @@ export function AdminWatchdogImport() {
                     {item.suggestedTitle ? ` · ${item.suggestedTitle}` : ""}
                   </p>
                 ) : null}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button className="btn-secondary" onClick={() => void handleReviewAction(item.id, "approve")} type="button">
+                    Godkänn
+                  </button>
+                  <button className="btn-secondary" onClick={() => void handleReviewAction(item.id, "reject")} type="button">
+                    Avvisa
+                  </button>
+                </div>
               </article>
             ))
           )}

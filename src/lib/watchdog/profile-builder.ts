@@ -3,6 +3,7 @@ import { PublicRecordCategory } from "@prisma/client";
 import type {
   WatchPublicFact,
   WatchRecordDigest,
+  WatchRecordSection,
   WatchRelationship,
   WatchTimelineEvent,
   WatchVerdict,
@@ -93,6 +94,37 @@ export function buildPublicFactsFromRecords(records: PublicRecord[], official: P
   }
 
   return facts;
+}
+
+export function buildRecordSectionsFromRecords(records: PublicRecord[]): WatchRecordSection[] {
+  const sectionOrder: Array<{ category: PublicRecordCategory; label: string; note: string }> = [
+    { category: PublicRecordCategory.INCOME, label: "Inkomster", note: "Offentligt redovisade ersättningar — inte fulla skatteunderlag." },
+    { category: PublicRecordCategory.TRAVEL, label: "Resor", note: "Resor från offentliga reseredovisningar och diarier." },
+    { category: PublicRecordCategory.COMPANY, label: "Bolag", note: "Styrelseuppdrag och bolagsroller från öppna register." },
+    { category: PublicRecordCategory.PROPERTY, label: "Fastigheter (verksamhet)", note: "Endast verksamhetsadresser — privata bostadsadresser maskeras." },
+    { category: PublicRecordCategory.COURT, label: "Domar", note: "Publicerade domstols- och beslutsposter." },
+    { category: PublicRecordCategory.RELATIONSHIP, label: "Relationer", note: "Dokumenterade kopplingar från offentliga källor." },
+  ];
+
+  return sectionOrder
+    .map((section) => ({
+      id: section.category.toLowerCase(),
+      label: section.label,
+      note: section.note,
+      items: records
+        .filter((record) => record.category === section.category)
+        .slice(0, 12)
+        .map((record) => ({
+          id: record.id,
+          title: record.title,
+          summary: record.summary,
+          date: (record.occurredAt || record.publishedAt).toISOString(),
+          sourceUrl: record.sourceUrl,
+          legalBasis: record.legalBasis,
+          amount: formatAmount(record.payload),
+        })),
+    }))
+    .filter((section) => section.items.length > 0);
 }
 
 export function buildTimelineFromRecords(records: PublicRecord[]): WatchTimelineEvent[] {
@@ -188,5 +220,42 @@ export async function deriveRelationshipsFromRecords(
         sourceUrl: record.sourceUrl,
       },
     });
+
+    const peerRecords = await prisma.publicRecord.findMany({
+      where: {
+        category: PublicRecordCategory.COMPANY,
+        officialId: { not: officialId },
+        title: { contains: orgName, mode: "insensitive" },
+      },
+      include: {
+        official: { select: { id: true, fullName: true } },
+      },
+      take: 6,
+    });
+
+    for (const peer of peerRecords) {
+      if (!peer.official) continue;
+
+      const coBoardExists = await prisma.officialRelationship.findFirst({
+        where: {
+          fromOfficialId: officialId,
+          toOfficialId: peer.official.id,
+          relationshipType: "Gemensamt styrelseuppdrag",
+        },
+      });
+
+      if (coBoardExists) continue;
+
+      await prisma.officialRelationship.create({
+        data: {
+          fromOfficialId: officialId,
+          toOfficialId: peer.official.id,
+          relationshipType: "Gemensamt styrelseuppdrag",
+          publicBasis: `Gemensam bolagskoppling i ${orgName}`,
+          sourceRecordId: record.id,
+          sourceUrl: record.sourceUrl,
+        },
+      });
+    }
   }
 }

@@ -2,10 +2,11 @@ import { AuthorityCategory, PublicRecordCategory, SourceKind } from "@prisma/cli
 import type { ConnectorContext, WatchdogConnector } from "@/lib/watchdog/connectors/base";
 import type { NormalizedRecordDraft } from "@/lib/watchdog/records";
 import { sanitizeRecordText } from "@/lib/watchdog/records";
+import { fetchJson, fetchText, paginateJson } from "@/lib/watchdog/connectors/http";
 
 const CONNECTOR_KEY = "domstol";
 
-type CourtDecisionSeed = {
+type CourtNewsItem = {
   id: string;
   court: string;
   courtSlug: string;
@@ -13,61 +14,68 @@ type CourtDecisionSeed = {
   summary: string;
   date: string;
   sourceUrl: string;
-  mentionedNames?: string[];
 };
 
-const COURT_FEED: CourtDecisionSeed[] = [
-  {
-    id: "domstol-1",
-    court: "Högsta domstolen",
-    courtSlug: "hogsta-domstolen",
-    title: "HD publicerar vägledande avgörande i offentlighetsmål",
-    summary: "Högsta domstolen publicerar vägledande praxis kring partsinsyn i myndighetsärenden.",
-    date: "2025-11-12",
-    sourceUrl: "https://www.domstol.se/nyheter-och-press/nyheter-fran-sveriges-domstolar/",
-    mentionedNames: ["Anna Lindberg", "Erik Johansson"],
-  },
-  {
-    id: "domstol-2",
-    court: "Kammarrätten i Stockholm",
-    courtSlug: "kammarratten-stockholm",
-    title: "Kammarrätten prövar överklagande i förvaltningsmål",
-    summary: "Kammarrätten publicerar dom i mål om myndighetsbeslut och rättelse.",
-    date: "2025-10-03",
-    sourceUrl: "https://www.domstol.se/nyheter-och-press/nyheter-fran-sveriges-domstolar/",
-    mentionedNames: ["Maria Svensson"],
-  },
-];
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
 
-async function fetchCourtNews(): Promise<CourtDecisionSeed[]> {
-  try {
-    const response = await fetch("https://www.domstol.se/api/news?language=sv&count=10", {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(20_000),
+function extractMentionedNames(text: string) {
+  const matches = text.match(/\b([A-ZÅÄÖ][a-zåäö]+ [A-ZÅÄÖ][a-zåäö]+)\b/g) || [];
+  return [...new Set(matches)].slice(0, 5);
+}
+
+async function fetchCourtNews(): Promise<CourtNewsItem[]> {
+  const apiItems = await paginateJson<CourtNewsItem>(
+    (page) => `https://www.domstol.se/api/news?language=sv&count=20&page=${page}`,
+    (payload) => {
+      const data = payload as {
+        items?: Array<{ id?: string; title?: string; preamble?: string; url?: string; date?: string; court?: string }>;
+      };
+      return (data.items || [])
+        .filter((item) => item.title)
+        .map((item, index) => ({
+          id: item.id || `domstol-api-${index}`,
+          court: item.court || "Sveriges Domstolar",
+          courtSlug: slugify(item.court || "sveriges-domstolar"),
+          title: item.title as string,
+          summary: item.preamble || item.title || "",
+          date: item.date || new Date().toISOString().slice(0, 10),
+          sourceUrl: item.url || "https://www.domstol.se/",
+        }));
+    },
+    { maxPages: 3 },
+  );
+
+  if (apiItems.length > 0) return apiItems;
+
+  const html = await fetchText("https://www.domstol.se/nyheter-och-press/nyheter-fran-sveriges-domstolar/");
+  if (!html) return [];
+
+  const items: CourtNewsItem[] = [];
+  const pattern = /href="([^"]+)"[^>]*class="[^"]*news[^"]*"[^>]*>[\s\S]*?<h\d[^>]*>([^<]+)<\/h\d>/gi;
+  let index = 0;
+  for (const match of html.matchAll(pattern)) {
+    const href = match[1].startsWith("http") ? match[1] : `https://www.domstol.se${match[1]}`;
+    items.push({
+      id: `domstol-html-${index}`,
+      court: "Sveriges Domstolar",
+      courtSlug: "sveriges-domstolar",
+      title: match[2].trim(),
+      summary: match[2].trim(),
+      date: new Date().toISOString().slice(0, 10),
+      sourceUrl: href,
     });
-    if (!response.ok) return COURT_FEED;
-
-    const payload = (await response.json()) as {
-      items?: Array<{ id?: string; title?: string; preamble?: string; url?: string; date?: string }>;
-    };
-
-    const remote = (payload.items || [])
-      .filter((item) => item.title)
-      .slice(0, 8)
-      .map((item, index) => ({
-        id: item.id || `remote-${index}`,
-        court: "Sveriges Domstolar",
-        courtSlug: "sveriges-domstolar",
-        title: item.title as string,
-        summary: item.preamble || item.title || "",
-        date: item.date || new Date().toISOString().slice(0, 10),
-        sourceUrl: item.url || "https://www.domstol.se/",
-      }));
-
-    return remote.length > 0 ? remote : COURT_FEED;
-  } catch {
-    return COURT_FEED;
+    index += 1;
+    if (index >= 15) break;
   }
+
+  return items;
 }
 
 export const domstolConnector: WatchdogConnector = {
@@ -91,6 +99,8 @@ export const domstolConnector: WatchdogConnector = {
         },
       });
 
+      const mentionedNames = extractMentionedNames(`${decision.title} ${decision.summary}`);
+
       drafts.push({
         connectorKey: CONNECTOR_KEY,
         category: PublicRecordCategory.COURT,
@@ -101,13 +111,10 @@ export const domstolConnector: WatchdogConnector = {
         sourceUrl: decision.sourceUrl,
         sourceRecordId: decision.id,
         legalBasis: "Publicerade domstolsnyheter och avgöranden",
-        payload: {
-          court: decision.court,
-          mentionedNames: decision.mentionedNames || [],
-        },
+        payload: { court: decision.court, mentionedNames, rawText: decision.summary },
       });
 
-      for (const name of decision.mentionedNames || []) {
+      for (const name of mentionedNames) {
         drafts.push({
           connectorKey: CONNECTOR_KEY,
           category: PublicRecordCategory.COURT,
@@ -116,7 +123,7 @@ export const domstolConnector: WatchdogConnector = {
           occurredAt: new Date(decision.date),
           sourceKind: SourceKind.COURT_RECORD,
           sourceUrl: decision.sourceUrl,
-          sourceRecordId: `${decision.id}-${name}`,
+          sourceRecordId: `${decision.id}-${slugify(name)}`,
           legalBasis: "Publicerad domstolshandling",
           officialHint: {
             fullName: name,

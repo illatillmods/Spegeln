@@ -37,7 +37,27 @@ export async function runConnector(connector: WatchdogConnector, context: Connec
   });
 
   try {
-    const drafts = await connector.run(context);
+    const maxAttempts = 3;
+    let lastError: Error | null = null;
+    let drafts: NormalizedRecordDraft[] = [];
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        drafts = await connector.run(context);
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error("Connector misslyckades.");
+        if (attempt < maxAttempts) {
+          await sleep(context.rateLimitMs * attempt);
+        }
+      }
+    }
+
+    if (lastError) {
+      throw lastError;
+    }
+
     await sleep(context.rateLimitMs);
 
     const resolved = await resolveRecordDrafts(context.prisma, drafts);

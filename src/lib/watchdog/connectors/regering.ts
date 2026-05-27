@@ -2,6 +2,7 @@ import { AuthorityCategory, OfficialCategory, PublicRecordCategory, SourceKind }
 import type { ConnectorContext, WatchdogConnector } from "@/lib/watchdog/connectors/base";
 import type { NormalizedRecordDraft } from "@/lib/watchdog/records";
 import { sanitizeRecordText } from "@/lib/watchdog/records";
+import { fetchJson, fetchText } from "@/lib/watchdog/connectors/http";
 
 const CONNECTOR_KEY = "regering";
 
@@ -11,66 +12,80 @@ type GovernmentMember = {
   title: string;
   department: string;
   departmentSlug: string;
-  profileUrl?: string;
+  profileUrl: string;
 };
 
-const GOVERNMENT_ROSTER: GovernmentMember[] = [
-  {
-    id: "pm",
-    name: "Ulf Kristersson",
-    title: "Statsminister",
-    department: "Statsrådsberedningen",
-    departmentSlug: "statsradsberedningen",
-    profileUrl: "https://www.regeringen.se/regeringskansliet/statsrad/ulf-kristersson/",
-  },
-  {
-    id: "finans",
-    name: "Elisabeth Svantesson",
-    title: "Finansminister",
-    department: "Finansdepartementet",
-    departmentSlug: "finansdepartementet",
-    profileUrl: "https://www.regeringen.se/regeringskansliet/statsrad/elisabeth-svantesson/",
-  },
-  {
-    id: "utrikes",
-    name: "Tobias Billström",
-    title: "Utrikesminister",
-    department: "Utrikesdepartementet",
-    departmentSlug: "utrikesdepartementet",
-    profileUrl: "https://www.regeringen.se/regeringskansliet/statsrad/tobias-billstrom/",
-  },
-  {
-    id: "justitie",
-    name: "Gunnar Strömmer",
-    title: "Justitieminister",
-    department: "Justitiedepartementet",
-    departmentSlug: "justitiedepartementet",
-    profileUrl: "https://www.regeringen.se/regeringskansliet/statsrad/gunnar-strommer/",
-  },
-];
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
 
-async function fetchPressReleases(): Promise<Array<{ title: string; summary: string; url: string; date?: string }>> {
-  try {
-    const response = await fetch("https://www.regeringen.se/pressmeddelanden/?format=json", {
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!response.ok) return [];
-    const payload = (await response.json()) as {
-      items?: Array<{ title?: string; preamble?: string; url?: string; published?: string }>;
-    };
-    return (payload.items || [])
-      .filter((item) => item.title && item.url)
-      .slice(0, 20)
-      .map((item) => ({
-        title: item.title as string,
-        summary: item.preamble || item.title || "",
-        url: item.url as string,
-        date: item.published,
-      }));
-  } catch {
-    return [];
+async function fetchGovernmentMembers(): Promise<GovernmentMember[]> {
+  const html = await fetchText("https://www.regeringen.se/regeringskansliet/statsrad/");
+  if (!html) return [];
+
+  const members: GovernmentMember[] = [];
+  const linkPattern =
+    /href="(\/regeringskansliet\/statsrad\/[^"]+)"[^>]*>[\s\S]*?<h2[^>]*>([^<]+)<\/h2>[\s\S]*?<p[^>]*>([^<]+)<\/p>/gi;
+
+  for (const match of html.matchAll(linkPattern)) {
+    const profilePath = match[1];
+    const name = match[2]?.trim();
+    const title = match[3]?.trim();
+    if (!name || !title) continue;
+
+    const profileUrl = `https://www.regeringen.se${profilePath}`;
+    const id = slugify(name);
+    const departmentMatch = title.match(/(?:minister|statsråd).*?(?:departement|beredning)/i);
+    const department = departmentMatch ? title : title.split("—")[0]?.trim() || "Regeringskansliet";
+    const departmentSlug = slugify(department) || "regeringskansliet";
+
+    members.push({ id, name, title, department, departmentSlug, profileUrl });
   }
+
+  if (members.length > 0) return members;
+
+  const fallbackHtml = await fetchText("https://www.regeringen.se/sok/?q=statsrad");
+  if (!fallbackHtml) return [];
+
+  const altPattern = /href="(https:\/\/www\.regeringen\.se\/regeringskansliet\/statsrad\/[^"]+)"/g;
+  let index = 0;
+  for (const match of fallbackHtml.matchAll(altPattern)) {
+    const profileUrl = match[1];
+    const id = slugify(profileUrl.split("/").pop() || `member-${index}`);
+    members.push({
+      id,
+      name: id.replace(/-/g, " "),
+      title: "Statsråd",
+      department: "Regeringskansliet",
+      departmentSlug: "regeringskansliet",
+      profileUrl,
+    });
+    index += 1;
+    if (index >= 24) break;
+  }
+
+  return members;
+}
+
+async function fetchPressReleases() {
+  const payload = await fetchJson<{
+    items?: Array<{ title?: string; preamble?: string; url?: string; published?: string }>;
+  }>("https://www.regeringen.se/pressmeddelanden/?format=json");
+
+  return (payload?.items || [])
+    .filter((item) => item.title && item.url)
+    .slice(0, 30)
+    .map((item) => ({
+      title: item.title as string,
+      summary: item.preamble || item.title || "",
+      url: item.url as string,
+      date: item.published,
+    }));
 }
 
 export const regeringConnector: WatchdogConnector = {
@@ -78,9 +93,9 @@ export const regeringConnector: WatchdogConnector = {
   label: "Regeringen",
   async run(context: ConnectorContext) {
     const drafts: NormalizedRecordDraft[] = [];
-    const pressReleases = await fetchPressReleases();
+    const [members, pressReleases] = await Promise.all([fetchGovernmentMembers(), fetchPressReleases()]);
 
-    for (const member of GOVERNMENT_ROSTER) {
+    for (const member of members) {
       await context.prisma.authority.upsert({
         where: { slug: member.departmentSlug },
         update: { name: member.department },
@@ -103,10 +118,7 @@ export const regeringConnector: WatchdogConnector = {
         sourceUrl: member.profileUrl,
         sourceRecordId: member.id,
         legalBasis: "Regeringens offentliga statsrådslista",
-        payload: {
-          department: member.department,
-          title: member.title,
-        },
+        payload: { department: member.department, title: member.title },
         identity: {
           sourceKey: "regering:statsrad",
           externalId: member.id,
@@ -133,7 +145,7 @@ export const regeringConnector: WatchdogConnector = {
         sourceUrl: release.url,
         sourceRecordId: release.url,
         legalBasis: "Regeringens pressmeddelanden",
-        payload: { kind: "press_release" },
+        payload: { kind: "press_release", rawText: release.summary },
       });
     }
 

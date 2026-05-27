@@ -66,8 +66,10 @@ import {
   getIngestReviewQueue,
   getIngestRunHistory,
   listWatchdogConnectors,
+  runWatchdogBackfill,
   runWatchdogOrchestrator,
 } from "../../src/lib/watchdog/orchestrator";
+import { approveIngestReviewItem, rejectIngestReviewItem } from "../../src/lib/watchdog/review";
 import {
   authenticateEmailUser,
   clearOAuthStateCookie,
@@ -779,10 +781,68 @@ app.post("/api/admin/watchdog/ingest-run", async (c) => {
     : undefined;
 
   try {
-    const result = await runWatchdogOrchestrator({ connectorKeys });
+    const result = await runWatchdogOrchestrator({
+      connectorKeys,
+      riksdagTravelFromYear: typeof payload.travelFromYear === "number" ? payload.travelFromYear : undefined,
+      riksdagTravelToYear: typeof payload.travelToYear === "number" ? payload.travelToYear : undefined,
+    });
     return c.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ingestion misslyckades.";
+    return c.json({ error: message }, 500);
+  }
+});
+
+app.post("/api/admin/watchdog/backfill", async (c) => {
+  const user = await getSessionUser(c);
+  if (!user || !requireRole(user, ["ADMIN", "ANALYST"])) {
+    return c.json({ error: "Behörighet saknas." }, 403);
+  }
+
+  const { searchParams } = new URL(c.req.url);
+  const fromYear = Number(searchParams.get("fromYear") || process.env.RIKSDAG_TRAVEL_FROM_YEAR || "2018");
+
+  try {
+    const result = await runWatchdogBackfill(Number.isFinite(fromYear) ? fromYear : 2018);
+    return c.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Backfill misslyckades.";
+    return c.json({ error: message }, 500);
+  }
+});
+
+app.post("/api/admin/watchdog/review/:id/approve", async (c) => {
+  const user = await getSessionUser(c);
+  if (!user || !requireRole(user, ["ADMIN", "ANALYST"])) {
+    return c.json({ error: "Behörighet saknas." }, 403);
+  }
+
+  const prisma = getPrismaClient();
+  if (!prisma) return c.json({ error: "DATABASE_URL saknas." }, 500);
+
+  try {
+    const result = await approveIngestReviewItem(prisma, c.req.param("id"));
+    return c.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Godkännande misslyckades.";
+    return c.json({ error: message }, 500);
+  }
+});
+
+app.post("/api/admin/watchdog/review/:id/reject", async (c) => {
+  const user = await getSessionUser(c);
+  if (!user || !requireRole(user, ["ADMIN", "ANALYST"])) {
+    return c.json({ error: "Behörighet saknas." }, 403);
+  }
+
+  const prisma = getPrismaClient();
+  if (!prisma) return c.json({ error: "DATABASE_URL saknas." }, 500);
+
+  try {
+    const result = await rejectIngestReviewItem(prisma, c.req.param("id"));
+    return c.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Avvisning misslyckades.";
     return c.json({ error: message }, 500);
   }
 });
@@ -1227,6 +1287,7 @@ app.post("/api/konto/watches", async (c) => {
   const watch = await upsertUserWatch({
     userId: user.id,
     authorityId: String(payload.authorityId),
+    officialId: typeof payload.officialId === "string" ? payload.officialId : null,
     cadence: payload.cadence || "DAILY",
     alertsEnabled: payload.alertsEnabled ?? true,
   });

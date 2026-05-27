@@ -2,44 +2,55 @@ import { AuthorityCategory, OfficialCategory, PublicRecordCategory, SourceKind }
 import type { ConnectorContext, WatchdogConnector } from "@/lib/watchdog/connectors/base";
 import type { NormalizedRecordDraft } from "@/lib/watchdog/records";
 import { sanitizeRecordText } from "@/lib/watchdog/records";
+import { fetchText } from "@/lib/watchdog/connectors/http";
 
 const CONNECTOR_KEY = "bolag";
 
-type BoardRoleSeed = {
-  orgNumber: string;
+type BoardSource = {
   companyName: string;
-  personName: string;
-  role: string;
-  fee?: string;
+  orgNumber?: string;
   sourceUrl: string;
 };
 
-const BOARD_ROLES: BoardRoleSeed[] = [
-  {
-    orgNumber: "556000-0001",
-    companyName: "Svenska Kraftnät",
-    personName: "Lotta Medelius-Wirenfeldt",
-    role: "Styrelseledamot",
-    fee: "180000",
-    sourceUrl: "https://www.svk.se/om-oss/organisation/styrelse/",
-  },
-  {
-    orgNumber: "556000-0002",
-    companyName: "PostNord AB",
-    personName: "Annemarie Gardshol",
-    role: "Styrelseordförande",
-    fee: "420000",
-    sourceUrl: "https://group.postnord.com/sv/om-postnord/bolagsstyrning/styrelse/",
-  },
-  {
-    orgNumber: "556000-0003",
-    companyName: "SJ AB",
-    personName: "Monica Lingegård",
-    role: "Styrelseledamot",
-    fee: "250000",
-    sourceUrl: "https://www.sj.se/sv/om-sj/bolagsstyrning/styrelse.html",
-  },
+const BOARD_SOURCES: BoardSource[] = [
+  { companyName: "Svenska Kraftnät", orgNumber: "556000-0001", sourceUrl: "https://www.svk.se/om-oss/organisation/styrelse/" },
+  { companyName: "PostNord AB", orgNumber: "556000-0002", sourceUrl: "https://group.postnord.com/sv/om-postnord/bolagsstyrning/styrelse/" },
+  { companyName: "SJ AB", orgNumber: "556000-0003", sourceUrl: "https://www.sj.se/sv/om-sj/bolagsstyrning/styrelse.html" },
+  { companyName: "LKAB", sourceUrl: "https://lkab.com/sv/om-oss/organisation/styrelse/" },
+  { companyName: "Vattenfall AB", sourceUrl: "https://group.vattenfall.com/sv/om-oss/organisation/styrelse" },
+  { companyName: "Svevia AB", sourceUrl: "https://www.svevia.se/om-svevia/organisation/styrelse/" },
+  { companyName: "Teracom AB", sourceUrl: "https://www.teracom.se/om-teracom/organisation/styrelse/" },
+  { companyName: "Infranord AB", sourceUrl: "https://www.infranord.se/om-infranord/styrelse/" },
 ];
+
+function slugify(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function extractBoardMembers(html: string) {
+  const members: Array<{ name: string; role: string }> = [];
+  const patterns = [
+    /<h\d[^>]*>([^<]+)<\/h\d>[\s\S]{0,200}?(styrelseledamot|ordförande|ledamot|suppleant)/gi,
+    /([A-ZÅÄÖ][a-zåäö]+ [A-ZÅÄÖ][a-zåäö]+(?:-[A-ZÅÄÖ][a-zåäö]+)?)\s*[,–-]\s*(styrelseordförande|styrelseledamot|ledamot|suppleant)/gi,
+    /(styrelseordförande|styrelseledamot|ledamot|suppleant)[^<]{0,40}([A-ZÅÄÖ][a-zåäö]+ [A-ZÅÄÖ][a-zåäö]+(?:-[A-ZÅÄÖ][a-zåäö]+)?)/gi,
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of html.matchAll(pattern)) {
+      const name = (match[1]?.match(/^[A-ZÅÄÖ]/) ? match[1] : match[2])?.trim();
+      const role = (match[1]?.match(/styrelse|ledamot|ordförande|suppleant/i) ? match[1] : match[2])?.trim() || "Styrelseledamot";
+      if (!name || name.length < 5) continue;
+      if (!members.some((entry) => entry.name === name)) {
+        members.push({ name, role });
+      }
+    }
+  }
+
+  return members.slice(0, 12);
+}
 
 export const bolagConnector: WatchdogConnector = {
   key: CONNECTOR_KEY,
@@ -47,81 +58,52 @@ export const bolagConnector: WatchdogConnector = {
   async run(context: ConnectorContext) {
     const drafts: NormalizedRecordDraft[] = [];
 
-    for (const role of BOARD_ROLES) {
-      const authoritySlug = role.companyName
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-|-$/g, "");
+    for (const source of BOARD_SOURCES) {
+      const html = await fetchText(source.sourceUrl);
+      if (!html) continue;
 
+      const authoritySlug = slugify(source.companyName);
       await context.prisma.authority.upsert({
         where: { slug: authoritySlug },
-        update: { name: role.companyName },
+        update: { name: source.companyName },
         create: {
-          name: role.companyName,
+          name: source.companyName,
           slug: authoritySlug,
           level: "Bolag",
           region: "Nationell",
           category: AuthorityCategory.PUBLIC_COMPANY,
-          summary: `${role.companyName} — offentligt bolag med publicerade styrelseuppdrag.`,
+          summary: `${source.companyName} — offentligt bolag med publicerade styrelseuppdrag.`,
         },
       });
 
-      drafts.push({
-        connectorKey: CONNECTOR_KEY,
-        category: PublicRecordCategory.COMPANY,
-        title: `${role.personName} — ${role.role} i ${role.companyName}`,
-        summary: sanitizeRecordText(
-          `${role.personName} har rollen ${role.role} i ${role.companyName} (org.nr ${role.orgNumber}).`,
-        ),
-        sourceKind: SourceKind.PUBLIC_REGISTRY,
-        sourceUrl: role.sourceUrl,
-        sourceRecordId: `${role.orgNumber}-${role.personName}`,
-        legalBasis: "Offentlig bolagsstyrning och årsredovisning",
-        payload: {
-          orgNumber: role.orgNumber,
-          companyName: role.companyName,
-          role: role.role,
-        },
-        identity: {
-          sourceKey: "bolag:org-role",
-          externalId: `${role.orgNumber}:${role.personName}`,
-          profileUrl: role.sourceUrl,
-        },
-        officialHint: {
-          fullName: role.personName,
-          title: role.role,
-          authoritySlug,
-          authorityName: role.companyName,
-          category: OfficialCategory.AGENCY_HEAD,
-        },
-      });
-
-      if (role.fee) {
+      const members = extractBoardMembers(html);
+      for (const member of members) {
         drafts.push({
           connectorKey: CONNECTOR_KEY,
-          category: PublicRecordCategory.INCOME,
-          title: `${role.personName} — offentligt redovisat arvode (${role.companyName})`,
+          category: PublicRecordCategory.COMPANY,
+          title: `${member.name} — ${member.role} i ${source.companyName}`,
           summary: sanitizeRecordText(
-            `Offentligt redovisat styrelsearvode: ${Number(role.fee).toLocaleString("sv-SE")} kr i ${role.companyName}.`,
+            `${member.name} har rollen ${member.role} i ${source.companyName}${source.orgNumber ? ` (org.nr ${source.orgNumber})` : ""}.`,
           ),
           sourceKind: SourceKind.PUBLIC_REGISTRY,
-          sourceUrl: role.sourceUrl,
-          sourceRecordId: `${role.orgNumber}-${role.personName}-fee`,
-          legalBasis: "Offentlig årsredovisning / bolagsstyrning",
+          sourceUrl: source.sourceUrl,
+          sourceRecordId: `${authoritySlug}-${slugify(member.name)}`,
+          legalBasis: "Offentlig bolagsstyrning",
           payload: {
-            amount: role.fee,
-            kind: "board_fee",
-            companyName: role.companyName,
+            orgNumber: source.orgNumber,
+            companyName: source.companyName,
+            role: member.role,
           },
           identity: {
             sourceKey: "bolag:org-role",
-            externalId: `${role.orgNumber}:${role.personName}`,
+            externalId: `${source.orgNumber || authoritySlug}:${member.name}`,
+            profileUrl: source.sourceUrl,
           },
           officialHint: {
-            fullName: role.personName,
-            title: role.role,
+            fullName: member.name,
+            title: member.role,
             authoritySlug,
-            authorityName: role.companyName,
+            authorityName: source.companyName,
             category: OfficialCategory.AGENCY_HEAD,
           },
         });

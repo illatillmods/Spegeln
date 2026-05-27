@@ -17,6 +17,7 @@ type StoredWatch = {
 type ServerWatch = {
   id: string;
   authorityId: string;
+  officialId?: string | null;
   authorityName: string;
   cadence: WatchCadence;
   updatedAt: string;
@@ -125,11 +126,14 @@ export function WatchSubscriptionPanel({
     void fetch("/api/konto/watches")
       .then((response) => response.json())
       .then((data: { items?: ServerWatch[] }) => {
-        const match = (data.items || []).find((watch) => watch.authorityId === authorityId) || null;
+        const match =
+          (data.items || []).find((watch) =>
+            targetType === "official" ? watch.officialId === targetId : watch.authorityId === authorityId && !watch.officialId,
+          ) || null;
         setServerWatch(match);
       })
       .catch(() => setServerWatch(null));
-  }, [loggedIn, authorityId]);
+  }, [loggedIn, authorityId, targetId, targetType]);
 
   function toggleChannel(channel: WatchChannel) {
     setDraftChannels((currentChannels) => {
@@ -168,6 +172,7 @@ export function WatchSubscriptionPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           authorityId,
+          officialId: targetType === "official" ? targetId : null,
           cadence,
           alertsEnabled: nextChannels.includes("email"),
         }),

@@ -473,6 +473,7 @@ model Official {
   identities OfficialIdentity[]
   relationshipsFrom OfficialRelationship[] @relation("RelationshipFrom")
   relationshipsTo OfficialRelationship[] @relation("RelationshipTo")
+  watches Watch[]
 
   @@unique([authorityId, fullName])
   @@index([authorityId])
@@ -495,6 +496,7 @@ model Watch {
   id           String            @id @default(cuid())
   userId       String
   authorityId  String
+  officialId   String?
   cadence      MonitoringCadence @default(DAILY)
   notes        String?
   alertsEnabled Boolean          @default(true)
@@ -502,9 +504,12 @@ model Watch {
   updatedAt    DateTime          @updatedAt
   user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   authority    Authority         @relation(fields: [authorityId], references: [id], onDelete: Cascade)
+  official     Official?         @relation(fields: [officialId], references: [id], onDelete: SetNull)
 
   @@unique([userId, authorityId])
+  @@unique([userId, officialId])
   @@index([authorityId])
+  @@index([officialId])
 }
 
 model Alert {

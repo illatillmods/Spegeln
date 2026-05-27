@@ -23,21 +23,38 @@ export async function emitIngestAlerts(prisma: PrismaClient, newRecordIds: strin
 
   for (const record of records) {
     const authorityId = record.authorityId || record.official?.authorityId;
-    if (!authorityId) continue;
+    const officialId = record.officialId || record.official?.id;
+
+    const watchFilters = [
+      ...(authorityId ? [{ authorityId, officialId: null as string | null }] : []),
+      ...(officialId ? [{ officialId }] : []),
+    ];
+
+    if (watchFilters.length === 0) continue;
 
     const watches = await prisma.watch.findMany({
       where: {
-        authorityId,
         alertsEnabled: true,
+        OR: watchFilters,
       },
-      select: { userId: true },
+      select: { userId: true, authorityId: true, officialId: true },
     });
 
     if (watches.length === 0) continue;
 
+    const existing = await prisma.alert.findFirst({
+      where: {
+        authorityId: authorityId || watches[0].authorityId,
+        title: record.official ? `Ny offentlig post: ${record.official.fullName}` : record.title,
+        detectedAt: { gte: new Date(Date.now() - 60 * 60 * 1000) },
+      },
+    });
+
+    if (existing) continue;
+
     await prisma.alert.create({
       data: {
-        authorityId,
+        authorityId: authorityId || watches[0].authorityId,
         severity: AlertSeverity.MEDIUM,
         title: record.official ? `Ny offentlig post: ${record.official.fullName}` : record.title,
         summary: record.summary.slice(0, 500),

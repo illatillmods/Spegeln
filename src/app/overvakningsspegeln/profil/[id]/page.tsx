@@ -158,6 +158,42 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
         </article>
       </section>
 
+      {profile.recordSections.length > 0 ? (
+        <section className="space-y-5 reveal">
+          <div>
+            <p className="eyebrow">Registerdata per kategori</p>
+            <h2 className="mt-2 font-title text-4xl">Inkomster, resor, bolag och domar — med källlänk.</h2>
+          </div>
+          <div className="grid gap-5 xl:grid-cols-2">
+            {profile.recordSections.map((section) => (
+              <article className="surface rounded-4xl p-6 md:p-8" key={section.id}>
+                <h3 className="font-title text-3xl">{section.label}</h3>
+                <p className="mt-2 text-(--muted) text-sm leading-7">{section.note}</p>
+                <div className="mt-5 space-y-4">
+                  {section.items.map((item) => (
+                    <article className="rounded-3xl border border-[rgba(22,32,42,0.08)] bg-white/80 p-4" key={item.id}>
+                      <h4 className="text-lg font-semibold">{item.title}</h4>
+                      <p className="mt-2 text-(--muted) text-sm leading-7">{item.summary}</p>
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                        <span className="tag">{formatDate(item.date)}</span>
+                        {item.amount ? <span className="tag">{item.amount}</span> : null}
+                      </div>
+                      {item.sourceUrl ? (
+                        <a className="btn-secondary mt-4 inline-flex text-sm" href={item.sourceUrl} rel="noreferrer" target="_blank">
+                          Källa: offentlig registerlänk
+                        </a>
+                      ) : item.legalBasis ? (
+                        <p className="mt-3 text-(--muted) text-xs">Offentlig grund: {item.legalBasis}</p>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <section className="grid gap-5 xl:grid-cols-[1.02fr_0.98fr]">
         <article className="surface rounded-4xl p-6 md:p-8 reveal">
           <p className="eyebrow">Offentliga relationer</p>

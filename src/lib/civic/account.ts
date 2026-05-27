@@ -2,7 +2,7 @@ import { getPrismaClient } from "@/lib/prisma";
 
 export type AccountNotification = {
   id: string;
-  kind: "batch" | "report" | "appeal" | "video" | "wiki";
+  kind: "batch" | "report" | "appeal" | "video" | "wiki" | "watchdog";
   title: string;
   summary: string;
   href: string;
@@ -34,7 +34,7 @@ export async function listAccountNotifications(userId: string, limit = 12): Prom
     return [];
   }
 
-  const [batches, reports, appeals, wikiRevisions] = await Promise.all([
+  const [batches, reports, appeals, wikiRevisions, userWatches] = await Promise.all([
     prisma.massAppealBatch.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
@@ -65,7 +65,27 @@ export async function listAccountNotifications(userId: string, limit = 12): Prom
         page: { select: { slug: true } },
       },
     }),
+    prisma.watch.findMany({
+      where: { userId, alertsEnabled: true },
+      select: { authorityId: true, officialId: true },
+    }),
   ]);
+
+  const authorityIds = [...new Set(userWatches.map((watch) => watch.authorityId))];
+  const watchdogAlerts =
+    authorityIds.length === 0
+      ? []
+      : await prisma.alert.findMany({
+          where: {
+            authorityId: { in: authorityIds },
+            detectedAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) },
+          },
+          orderBy: { detectedAt: "desc" },
+          take: limit,
+          include: {
+            authority: { select: { slug: true, name: true } },
+          },
+        });
 
   const notifications: AccountNotification[] = [
     ...batches.map((batch) => ({
@@ -104,6 +124,15 @@ export async function listAccountNotifications(userId: string, limit = 12): Prom
       createdAt: revision.createdAt.toISOString(),
       status: revision.moderationDecision,
     })),
+    ...watchdogAlerts.map((alert) => ({
+      id: `watchdog-${alert.id}`,
+      kind: "watchdog" as const,
+      title: alert.title,
+      summary: alert.summary,
+      href: `/overvakningsspegeln/autoritet#${alert.authority.slug}`,
+      createdAt: alert.detectedAt.toISOString(),
+      status: alert.severity,
+    })),
   ];
 
   return notifications
@@ -126,6 +155,7 @@ export async function listUserWatches(userId: string) {
   return watches.map((watch) => ({
     id: watch.id,
     authorityId: watch.authorityId,
+    officialId: watch.officialId,
     authorityName: watch.authority.name,
     authoritySlug: watch.authority.slug,
     cadence: watch.cadence,
@@ -137,12 +167,36 @@ export async function listUserWatches(userId: string) {
 export async function upsertUserWatch(input: {
   userId: string;
   authorityId: string;
+  officialId?: string | null;
   cadence: "DAILY" | "HOURLY" | "REALTIME";
   alertsEnabled?: boolean;
 }) {
   const prisma = getPrismaClient();
   if (!prisma) {
     throw new Error("DATABASE_URL saknas.");
+  }
+
+  if (input.officialId) {
+    return prisma.watch.upsert({
+      where: {
+        userId_officialId: {
+          userId: input.userId,
+          officialId: input.officialId,
+        },
+      },
+      update: {
+        cadence: input.cadence,
+        alertsEnabled: input.alertsEnabled ?? true,
+        authorityId: input.authorityId,
+      },
+      create: {
+        userId: input.userId,
+        authorityId: input.authorityId,
+        officialId: input.officialId,
+        cadence: input.cadence,
+        alertsEnabled: input.alertsEnabled ?? true,
+      },
+    });
   }
 
   return prisma.watch.upsert({
