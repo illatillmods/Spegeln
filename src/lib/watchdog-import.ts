@@ -1,4 +1,4 @@
-import { AuthorityCategory } from "@prisma/client";
+import { AuthorityCategory, OfficialCategory, type PrismaClient } from "@prisma/client";
 import { getPrismaClient } from "@/lib/prisma";
 
 export type WatchdogImportRow = {
@@ -7,8 +7,76 @@ export type WatchdogImportRow = {
   officialName: string;
   officialTitle: string;
   category?: AuthorityCategory;
+  officialCategory?: OfficialCategory;
   region?: string;
+  sourceKey?: string;
+  externalId?: string;
+  profileUrl?: string;
+  photoUrl?: string;
+  slug?: string;
 };
+
+function normalizeFullName(name: string) {
+  return name.trim().replace(/\s+/g, " ");
+}
+
+export async function upsertOfficialFromRow(
+  prisma: PrismaClient,
+  row: WatchdogImportRow,
+  authorityId: string,
+) {
+  const fullName = normalizeFullName(row.officialName);
+
+  const existing = await prisma.official.findUnique({
+    where: { authorityId_fullName: { authorityId, fullName } },
+  });
+
+  const official = existing
+    ? await prisma.official.update({
+        where: { id: existing.id },
+        data: {
+          title: row.officialTitle,
+          category: row.officialCategory ?? existing.category,
+          photoUrl: row.photoUrl ?? existing.photoUrl,
+          slug: row.slug ?? existing.slug,
+          lastIngestedAt: new Date(),
+        },
+      })
+    : await prisma.official.create({
+        data: {
+          fullName,
+          title: row.officialTitle,
+          authorityId,
+          category: row.officialCategory ?? OfficialCategory.OTHER,
+          photoUrl: row.photoUrl,
+          slug: row.slug,
+          lastIngestedAt: new Date(),
+        },
+      });
+
+  if (row.sourceKey && row.externalId) {
+    await prisma.officialIdentity.upsert({
+      where: {
+        sourceKey_externalId: {
+          sourceKey: row.sourceKey,
+          externalId: row.externalId,
+        },
+      },
+      update: {
+        officialId: official.id,
+        profileUrl: row.profileUrl,
+      },
+      create: {
+        officialId: official.id,
+        sourceKey: row.sourceKey,
+        externalId: row.externalId,
+        profileUrl: row.profileUrl,
+      },
+    });
+  }
+
+  return { official, created: !existing };
+}
 
 export async function importWatchdogRows(rows: WatchdogImportRow[]) {
   const prisma = getPrismaClient();
@@ -18,6 +86,7 @@ export async function importWatchdogRows(rows: WatchdogImportRow[]) {
 
   let createdAuthorities = 0;
   let createdOfficials = 0;
+  let updatedOfficials = 0;
 
   for (const row of rows) {
     const authority = await prisma.authority.upsert({
@@ -40,15 +109,13 @@ export async function importWatchdogRows(rows: WatchdogImportRow[]) {
       createdAuthorities += 1;
     }
 
-    await prisma.official.create({
-      data: {
-        fullName: row.officialName,
-        title: row.officialTitle,
-        authorityId: authority.id,
-      },
-    });
-    createdOfficials += 1;
+    const { created } = await upsertOfficialFromRow(prisma, row, authority.id);
+    if (created) {
+      createdOfficials += 1;
+    } else {
+      updatedOfficials += 1;
+    }
   }
 
-  return { createdAuthorities, createdOfficials, total: rows.length };
+  return { createdAuthorities, createdOfficials, updatedOfficials, total: rows.length };
 }

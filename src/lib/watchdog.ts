@@ -1,6 +1,14 @@
 import { getDisclosureBoundaries } from "@/lib/disclosure-policy";
 import { getPrismaClient } from "@/lib/prisma";
 import {
+  buildPublicFactsFromRecords,
+  buildRecordDigestsFromRecords,
+  buildRelationshipsFromRecords,
+  buildTimelineFromRecords,
+  buildVerdictsFromRecords,
+  deriveRelationshipsFromRecords,
+} from "@/lib/watchdog/profile-builder";
+import {
   AlertSeverity,
   ModerationDecision,
   SeverityLevel,
@@ -154,6 +162,20 @@ export type WatchCourtTestimonial = {
   headline: string;
   body: string;
   createdAt: string;
+};
+
+export type WatchPublicRecordFeedItem = {
+  id: string;
+  category: string;
+  title: string;
+  summary: string;
+  publishedAt: string;
+  sourceUrl?: string | null;
+  connectorKey: string;
+  officialId?: string | null;
+  officialName?: string | null;
+  authorityName?: string | null;
+  authoritySlug?: string | null;
 };
 
 export type WatchProfile = {
@@ -484,13 +506,14 @@ export async function getWatchdogSnapshot(): Promise<WatchdogSnapshot> {
     };
   }
 
-  const [officialsCovered, authoritiesCovered, liveAlerts, publishedReports, complaints, failureReports, sources] = await Promise.all([
+  const [officialsCovered, authoritiesCovered, liveAlerts, publishedReports, complaints, failureReports, publicRecords, sources] = await Promise.all([
     prisma.official.count(),
     prisma.authority.count(),
     prisma.alert.count(),
     prisma.report.count(),
     prisma.complaint.count(),
     prisma.authorityFailureReport.count(),
+    prisma.publicRecord.count(),
     prisma.monitoringSource.findMany({
       select: { sourceKind: true },
       distinct: ["sourceKind"],
@@ -498,15 +521,19 @@ export async function getWatchdogSnapshot(): Promise<WatchdogSnapshot> {
   ]);
 
   return {
-    totalTrackedRecords: liveAlerts + publishedReports + complaints + failureReports,
+    totalTrackedRecords: liveAlerts + publishedReports + complaints + failureReports + publicRecords,
     officialsCovered,
     authoritiesCovered,
     publishedReports,
     liveAlerts,
     dailySyncCoverage:
-      "Livevyn uppdateras från databasen med nya offentliga poster, rapporter, klagomål och granskningsärenden så snart de kopplats till rätt spår.",
+      publicRecords > 0
+        ? `${publicRecords} offentliga registerposter har ingestats via den automatiska övervakningspipelinen. Livevyn uppdateras vid varje schemalagd körning.`
+        : "Livevyn uppdateras från databasen med nya offentliga poster, rapporter, klagomål och granskningsärenden så snart de kopplats till rätt spår.",
     publicSourceFamilies:
-      sources.length > 0 ? sources.map((source) => sourceKindLabel(source.sourceKind)) : ["Publikt register", "Rapportflöde"],
+      sources.length > 0
+        ? [...new Set([...sources.map((source) => sourceKindLabel(source.sourceKind)), "Automatisk ingestion"])]
+        : ["Publikt register", "Rapportflöde", "Automatisk ingestion"],
     guardrails: [
       "Visar offentliga poster, publika rapporter och metadata som redan kopplats till plattformens öppna spår.",
       "Privata hemadresser, familjeuppgifter och obekräftad rådata kapas bort så att fokus stannar på offentlig maktutövning.",
@@ -614,6 +641,32 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
     return null;
   }
 
+  const [publicRecords, storedRelationships] = await Promise.all([
+    prisma.publicRecord.findMany({
+      where: { officialId: id },
+      orderBy: [{ occurredAt: "desc" }, { publishedAt: "desc" }],
+      take: 60,
+    }),
+    prisma.officialRelationship.findMany({
+      where: { fromOfficialId: id },
+      include: {
+        toOfficial: {
+          select: { fullName: true, title: true },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
+  ]);
+
+  await deriveRelationshipsFromRecords(prisma, id, publicRecords);
+
+  const ingestedFacts = buildPublicFactsFromRecords(publicRecords, official);
+  const ingestedTimeline = buildTimelineFromRecords(publicRecords);
+  const ingestedDigests = buildRecordDigestsFromRecords(publicRecords);
+  const ingestedVerdicts = buildVerdictsFromRecords(publicRecords);
+  const ingestedRelationships = buildRelationshipsFromRecords(storedRelationships, official.fullName);
+
   const trust = trustFromVotes(official.confidenceVotes, official.testimonials.length);
   const recordDigests = [
     ...official.failureReports.map((item) => ({
@@ -643,6 +696,10 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
   ]
     .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
     .slice(0, 8);
+
+  const mergedRecordDigests = [...ingestedDigests, ...recordDigests]
+    .sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime())
+    .slice(0, 12);
 
   const timeline = [
     ...official.authority.alerts.map((alert) => ({
@@ -689,6 +746,7 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
       connectedEntities: [official.authority.name],
       highlight: item.status === "LEGAL_REVIEW",
     })),
+    ...ingestedTimeline,
   ].sort((left, right) => new Date(right.date).getTime() - new Date(left.date).getTime());
 
   const alerts = official.authority.alerts.length > 0
@@ -739,6 +797,30 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
     });
   }
 
+  if (publicRecords.length > 0) {
+    patternSignals.push({
+      id: `${official.id}-ingested`,
+      title: "Automatiskt ingestade offentliga poster",
+      summary: `${publicRecords.length} registerposter från öppna källor (inkomst, resor, bolag, domstol m.m.) driver profilen.`,
+      status: "Bekräftad",
+    });
+  }
+
+  const platformFacts: WatchPublicFact[] = [
+    {
+      id: `${official.id}-published`,
+      label: "Publika rapporter och diarieförda poster",
+      values: [
+        `${official.authority._count.reports} publicerade eller aktiva rapportspår`,
+        `${official._count.complaints} klagomål i granskningsflödet`,
+        `${official._count.failureReports} granskningsärenden`,
+      ],
+      note: "Visar bara poster som redan finns i plattformens granskade datalager eller i myndighetens offentliga källkedja.",
+    },
+  ];
+
+  const publicFacts = ingestedFacts.length > 1 ? ingestedFacts : [...ingestedFacts, ...platformFacts];
+
   if (official.authority.reports.some((item) => item.status === "LEGAL_REVIEW")) {
     patternSignals.push({
       id: `${official.id}-legal-review`,
@@ -747,6 +829,31 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
       status: "Framväxande",
     });
   }
+
+  const relationships: WatchRelationship[] = [
+    ...ingestedRelationships,
+    {
+      id: `${official.id}-authority`,
+      name: official.authority.name,
+      category: "Myndighet",
+      relationship: "Tjänsteroll och beslutsmiljö",
+      publicBasis: "Myndighetsregister och offentlig organisationsdata",
+      overlap: "Profilen ankras till den myndighet där offentliga klagomål, rapporter och alerts registreras.",
+      recordCount:
+        official._count.complaints + official._count.failureReports + official.authority._count.reports + official.authority._count.alerts + publicRecords.length,
+    },
+    ...official.authority.sources.slice(0, 5).map((source) => ({
+      id: `${official.id}-${source.id}`,
+      name: source.name,
+      category: sourceKindLabel(source.sourceKind),
+      relationship: "Verifierad offentlig källa i granskningskedjan",
+      publicBasis: source.legalBasisNote || "Registrerad bevakningskälla med definierat granskningsändamål",
+      overlap:
+        source.description ||
+        `Källfamiljen ${source.name} används för att verifiera offentliga poster kopplade till tjänsterollen och myndighetsytan.`,
+      recordCount: 1,
+    })),
+  ];
 
   return {
     id: official.id,
@@ -757,91 +864,68 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
     authoritySlug: official.authority.slug,
     summary:
       official.riskNote ||
-      `${official.title} på ${official.authority.name}. Profilen sammanställer klagomål, granskningsärenden, publika rapporter och aktiva alerts från den anslutna myndighetsytan.`,
+      `${official.title} på ${official.authority.name}. Profilen sammanställer offentliga registerposter, klagomål, granskningsärenden och alerts från den automatiska övervakningspipelinen.`,
     statusNote:
-      official.authority.alerts.length > 0
-        ? `${official.authority.alerts.length} live alerts är aktiva i myndighetsytan just nu.`
-        : "Inga separata myndighetsalerts ligger ute just nu; feeden bygger i stället på klagomål, rapporter och granskningsärenden.",
+      publicRecords.length > 0
+        ? `${publicRecords.length} offentliga registerposter ingestade. ${official.authority.alerts.length} live alerts i myndighetsytan.`
+        : official.authority.alerts.length > 0
+          ? `${official.authority.alerts.length} live alerts är aktiva i myndighetsytan just nu.`
+          : "Inga separata myndighetsalerts just nu; feeden bygger på klagomål, rapporter och granskningsärenden.",
     totalSignals:
       official._count.complaints +
       official._count.failureReports +
       official.authority._count.reports +
-      official.authority._count.alerts,
-    monitoredSources: official.authority.sources.length,
+      official.authority._count.alerts +
+      publicRecords.length,
+    monitoredSources: official.authority.sources.length + (publicRecords.length > 0 ? 1 : 0),
     publishedReports: official.authority._count.reports,
     openAlerts: alerts.length,
     complaints: official._count.complaints,
     failureReports: official._count.failureReports,
     lastDailySyncAt: latestIsoString([
       official.updatedAt,
+      official.lastIngestedAt,
+      publicRecords[0]?.publishedAt,
       official.authority.updatedAt,
       official.authority.alerts[0]?.detectedAt,
       official.failureReports[0]?.updatedAt,
       official.complaints[0]?.updatedAt,
       official.authority.reports[0]?.updatedAt,
     ]),
-    refreshPolicy: "Profilerna uppdateras från databasen när nya alerts, rapporter, klagomål eller granskningar ger mer bränsle till spåret.",
-    coverage: official.authority.sources.map((source) => ({
-      id: source.id,
-      label: source.name,
-      category: sourceKindLabel(source.sourceKind),
-      cadence: source.sourceKind === SourceKind.FOI_RESPONSE ? "När nya svar registreras" : "Löpande när nya poster skrivs in",
-      status: "Aktiv",
-      lastActivityAt: source.updatedAt.toISOString(),
-      note: source.description || `Källfamiljen ${source.name} är kopplad till myndighetsytan och används i granskningsflödet.`,
-      sourceUrl: source.baseUrl,
-      legalBasis: source.legalBasisNote || "Källan används som offentlig grund för att bygga profil, tidslinje och vidare tryck.",
-    })),
-    publicFacts: [
-      {
-        id: `${official.id}-role`,
-        label: "Tjänsteroll och ansvarsyta",
-        values: [`${official.title} · ${official.authority.name}`],
-        note: "Tjänsterollen visas för att koppla offentliga poster till korrekt beslutsnivå och myndighetskontext.",
-      },
-      {
-        id: `${official.id}-published`,
-        label: "Publika rapporter och diarieförda poster",
-        values: [
-          `${official.authority._count.reports} publicerade eller aktiva rapportspår`,
-          `${official._count.complaints} klagomål i granskningsflödet`,
-          `${official._count.failureReports} granskningsärenden`,
-        ],
-        note: "Visar bara poster som redan finns i plattformens granskade datalager eller i myndighetens offentliga källkedja.",
-      },
-      {
-        id: `${official.id}-sources`,
-        label: "Anslutna offentliga källfamiljer",
-        values:
-          official.authority.sources.length > 0
-            ? Array.from(new Set(official.authority.sources.map((source) => sourceKindLabel(source.sourceKind))))
-            : ["Publika rapporter", "Klagomålsflöde"],
-        note: "Källfamiljer beskriver vilken typ av offentlig dokumentation som driver profilen. De är inte i sig bevis för ansvar.",
-      },
-    ],
-    relationships: [
-      {
-        id: `${official.id}-authority`,
-        name: official.authority.name,
-        category: "Myndighet",
-        relationship: "Tjänsteroll och beslutsmiljö",
-        publicBasis: "Myndighetsregister och offentlig organisationsdata",
-        overlap: "Profilen ankras till den myndighet där offentliga klagomål, rapporter och alerts registreras.",
-        recordCount:
-          official._count.complaints + official._count.failureReports + official.authority._count.reports + official.authority._count.alerts,
-      },
-      ...official.authority.sources.slice(0, 5).map((source) => ({
-        id: `${official.id}-${source.id}`,
-        name: source.name,
+    refreshPolicy:
+      publicRecords.length > 0
+        ? "Profilen uppdateras automatiskt vid schemalagd ingestion från Riksdag, regering, domstol, bolag och andra offentliga källor."
+        : "Profilerna uppdateras från databasen när nya alerts, rapporter, klagomål eller granskningar ger mer bränsle till spåret.",
+    coverage: [
+      ...official.authority.sources.map((source) => ({
+        id: source.id,
+        label: source.name,
         category: sourceKindLabel(source.sourceKind),
-        relationship: "Verifierad offentlig källa i granskningskedjan",
-        publicBasis: source.legalBasisNote || "Registrerad bevakningskälla med definierat granskningsändamål",
-        overlap:
-          source.description ||
-          `Källfamiljen ${source.name} används för att verifiera offentliga poster kopplade till tjänsterollen och myndighetsytan.`,
-        recordCount: 1,
+        cadence: source.sourceKind === SourceKind.FOI_RESPONSE ? "När nya svar registreras" : "Löpande när nya poster skrivs in",
+        status: "Aktiv",
+        lastActivityAt: source.updatedAt.toISOString(),
+        note: source.description || `Källfamiljen ${source.name} är kopplad till myndighetsytan och används i granskningsflödet.`,
+        sourceUrl: source.baseUrl,
+        legalBasis: source.legalBasisNote || "Källan används som offentlig grund för att bygga profil, tidslinje och vidare tryck.",
       })),
+      ...(publicRecords.length > 0
+        ? [
+            {
+              id: `${official.id}-ingest`,
+              label: "Automatisk registeringestion",
+              category: "Publikt register",
+              cadence: "Schemalagd daglig synk",
+              status: "Aktiv",
+              lastActivityAt: (publicRecords[0]?.publishedAt || official.updatedAt).toISOString(),
+              note: `${publicRecords.length} poster från öppna källor (inkomst, resor, bolag, domstol).`,
+              sourceUrl: publicRecords[0]?.sourceUrl,
+              legalBasis: publicRecords[0]?.legalBasis || "Offentliga register och öppna API:er",
+            },
+          ]
+        : []),
     ],
+    publicFacts,
+    relationships,
     disclosureBoundaries: buildDisclosureBoundaries(),
     patternSignals: patternSignals.length > 0
       ? patternSignals
@@ -853,8 +937,8 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
         }],
     timeline,
     alerts,
-    recordDigests,
-    verdicts: [],
+    recordDigests: mergedRecordDigests,
+    verdicts: ingestedVerdicts,
     trust,
     courtTestimonials: official.testimonials.map((item) => ({
       headline: item.headline,
@@ -863,4 +947,44 @@ export async function getWatchdogProfile(id: string): Promise<WatchProfile | nul
     })),
     watchTarget: buildOfficialWatchTarget(official.id, official.fullName),
   };
+}
+
+const publicRecordCategoryLabels: Record<import("@prisma/client").PublicRecordCategory, string> = {
+  ROLE: "Tjänsteroll",
+  INCOME: "Offentlig ersättning",
+  PROPERTY: "Verksamhetsadress",
+  TRAVEL: "Resa",
+  COURT: "Domstol",
+  COMPANY: "Bolagsroll",
+  RELATIONSHIP: "Relation",
+  PROCUREMENT: "Upphandling",
+  OTHER: "Offentlig post",
+};
+
+export async function getWatchdogPublicFeed(limit = 24): Promise<WatchPublicRecordFeedItem[]> {
+  const prisma = getPrismaClient();
+  if (!prisma) return [];
+
+  const records = await prisma.publicRecord.findMany({
+    orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+    take: limit,
+    include: {
+      official: { select: { id: true, fullName: true } },
+      authority: { select: { name: true, slug: true } },
+    },
+  });
+
+  return records.map((record) => ({
+    id: record.id,
+    category: publicRecordCategoryLabels[record.category],
+    title: record.title,
+    summary: record.summary,
+    publishedAt: record.publishedAt.toISOString(),
+    sourceUrl: record.sourceUrl,
+    connectorKey: record.connectorKey,
+    officialId: record.official?.id,
+    officialName: record.official?.fullName,
+    authorityName: record.authority?.name,
+    authoritySlug: record.authority?.slug,
+  }));
 }

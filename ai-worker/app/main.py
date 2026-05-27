@@ -25,6 +25,7 @@ SUPPORTED_JOBS = [
     "watchdog.triage_case",
     "watchdog.generate_press_release",
     "watchdog.reverse_surveillance",
+    "watchdog.normalize_record",
     "appeals.generate_bundle",
     "nlp.classify_document",
     "nlp.extract_entities",
@@ -145,6 +146,24 @@ class AutomatedAppealBundleResponse(BaseModel):
     parsedDecisionSummary: str
     riskSummary: str
     artifacts: list[AutomatedAppealArtifact]
+
+
+class WatchdogNormalizeRecordRequest(BaseModel):
+    title: str
+    summary: str
+    connector_key: str = "unknown"
+    source_kind: str = "PUBLIC_REGISTRY"
+    locale: str = "sv-SE"
+
+
+class WatchdogNormalizeRecordResponse(BaseModel):
+    category: str
+    severity: str
+    suggestedOfficialName: str | None = None
+    suggestedTitle: str | None = None
+    suggestedAuthoritySlug: str | None = None
+    entities: list[str] = []
+    summary: str
 
 
 async def require_worker_secret(x_worker_secret: str | None) -> None:
@@ -380,6 +399,28 @@ def build_appeal_bundle_rules(payload: AutomatedAppealBundleRequest) -> Automate
     )
 
 
+def build_normalize_record_rules(payload: WatchdogNormalizeRecordRequest) -> WatchdogNormalizeRecordResponse:
+    lowered = f"{payload.title} {payload.summary}".lower()
+    category = "OTHER"
+    if any(word in lowered for word in ["resa", "flyg", "tåg", "hotell"]):
+        category = "TRAVEL"
+    elif any(word in lowered for word in ["arvode", "ersättning", "lön", "inkomst"]):
+        category = "INCOME"
+    elif any(word in lowered for word in ["styrelse", "bolag", "vd", "org.nr"]):
+        category = "COMPANY"
+    elif any(word in lowered for word in ["dom", "domstol", "avgörande"]):
+        category = "COURT"
+    elif any(word in lowered for word in ["minister", "ledamot", "direktör", "roll"]):
+        category = "ROLE"
+
+    return WatchdogNormalizeRecordResponse(
+        category=category,
+        severity="medium",
+        summary=payload.summary[:500],
+        entities=[],
+    )
+
+
 @app.get("/healthz", response_model=HealthResponse)
 async def healthz() -> HealthResponse:
     return build_health_payload()
@@ -490,6 +531,22 @@ async def reverse_surveillance(payload: ReverseSurveillanceRequest, x_worker_sec
     if model_result:
         return ReverseSurveillanceResponse(**model_result)
     return build_reverse_surveillance_rules(payload)
+
+
+@app.post("/v1/watchdog/normalize-record", response_model=WatchdogNormalizeRecordResponse)
+async def normalize_record(payload: WatchdogNormalizeRecordRequest, x_worker_secret: str | None = Header(default=None)) -> WatchdogNormalizeRecordResponse:
+    await require_worker_secret(x_worker_secret)
+    model_result = await maybe_call_model(
+        system_prompt=(
+            "Normalize a raw public-record snippet for Spegeln watchdog ingestion. "
+            "Return JSON with category (ROLE|INCOME|PROPERTY|TRAVEL|COURT|COMPANY|RELATIONSHIP|PROCUREMENT|OTHER), "
+            "severity (low|medium|high), suggestedOfficialName, suggestedTitle, suggestedAuthoritySlug, entities (array of strings), summary."
+        ),
+        user_payload=payload.model_dump(),
+    )
+    if model_result:
+        return WatchdogNormalizeRecordResponse(**model_result)
+    return build_normalize_record_rules(payload)
 
 
 @app.post("/v1/appeals/generate-bundle", response_model=AutomatedAppealBundleResponse)

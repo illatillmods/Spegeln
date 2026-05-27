@@ -1,4 +1,5 @@
 import { importWatchdogRows, type WatchdogImportRow } from "@/lib/watchdog-import";
+import { runWatchdogOrchestrator } from "@/lib/watchdog/orchestrator";
 
 type RemoteOfficialRow = {
   authorityName?: string;
@@ -32,18 +33,12 @@ export async function runWatchdogIngestionFromUrl(url: string) {
     .filter((row) => row.authorityName && row.authoritySlug && row.officialName);
 
   if (normalized.length === 0) {
-    return { createdAuthorities: 0, createdOfficials: 0, total: 0, skipped: true };
+    return { createdAuthorities: 0, createdOfficials: 0, updatedOfficials: 0, total: 0, skipped: true };
   }
 
   return importWatchdogRows(normalized);
 }
 
 export async function runConfiguredWatchdogIngestion() {
-  const url = process.env.WATCHDOG_INGEST_URL;
-  if (!url) {
-    return { skipped: true, reason: "WATCHDOG_INGEST_URL saknas." };
-  }
-
-  const result = await runWatchdogIngestionFromUrl(url);
-  return { skipped: false, ...result };
+  return runWatchdogOrchestrator();
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getProtestModule } from "@/lib/module-manifest";
-import type { WatchAuthorityCard, WatchdogSnapshot } from "@/lib/watchdog";
+import type { WatchAuthorityCard, WatchdogSnapshot, WatchPublicRecordFeedItem } from "@/lib/watchdog";
 import { serverApiJson } from "@/lib/server-api";
 
 const mod = getProtestModule("overvakningsspegeln")!;
@@ -11,12 +11,14 @@ export const metadata = {
 };
 
 export default async function OvervakningsspegelnPage() {
-  const [snapshotResponse, authoritiesResponse] = await Promise.all([
+  const [snapshotResponse, authoritiesResponse, feedResponse] = await Promise.all([
     serverApiJson<{ snapshot: WatchdogSnapshot }>("/api/watchdog/snapshot"),
     serverApiJson<{ items: WatchAuthorityCard[] }>("/api/watchdog/authorities"),
+    serverApiJson<{ items: WatchPublicRecordFeedItem[] }>("/api/watchdog/feed"),
   ]);
   const snapshot = snapshotResponse.snapshot;
   const authorities = authoritiesResponse.items;
+  const feedItems = feedResponse.items;
   const entryPoints = [
     {
       eyebrow: "Sök",
@@ -110,6 +112,49 @@ export default async function OvervakningsspegelnPage() {
             <span className="mt-6 inline-flex text-sm font-semibold text-(--foreground)">{card.cta}</span>
           </Link>
         ))}
+      </section>
+
+      <section className="space-y-5 reveal">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="eyebrow">Live från pipelinen</p>
+            <h2 className="mt-2 font-title text-4xl">Senaste offentliga registerposter — med källlänk.</h2>
+          </div>
+          <Link className="btn-secondary" href="/overvakningsspegeln/sok">
+            Gå till profilsök
+          </Link>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-2">
+          {feedItems.length === 0 ? (
+            <article className="surface rounded-[1.9rem] p-6 text-(--muted) text-sm leading-7 lg:col-span-2">
+              Inga automatiska registerposter ännu. Kör ingestion via admin eller vänta på schemalagd cron.
+            </article>
+          ) : (
+            feedItems.slice(0, 8).map((item) => (
+              <article className="surface rounded-[1.9rem] p-6" key={item.id}>
+                <p className="eyebrow">{item.category} · {item.connectorKey}</p>
+                <h3 className="mt-2 font-title text-2xl">{item.title}</h3>
+                <p className="mt-3 text-(--muted) text-sm leading-7">{item.summary}</p>
+                <div className="mt-4 flex flex-wrap gap-2 text-xs">
+                  {item.officialName ? (
+                    <Link className="tag" href={`/overvakningsspegeln/profil/${item.officialId}`}>
+                      {item.officialName}
+                    </Link>
+                  ) : null}
+                  {item.authorityName ? <span className="tag">{item.authorityName}</span> : null}
+                  <span className="tag">
+                    {new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(item.publishedAt))}
+                  </span>
+                </div>
+                {item.sourceUrl ? (
+                  <a className="btn-secondary mt-4 inline-flex text-sm" href={item.sourceUrl} rel="noreferrer" target="_blank">
+                    Källa: offentlig registerlänk
+                  </a>
+                ) : null}
+              </article>
+            ))
+          )}
+        </div>
       </section>
 
       <section className="space-y-5 reveal">

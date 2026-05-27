@@ -8,7 +8,7 @@ import type {
   ReverseSurveillanceView,
   WikiPageView,
 } from "@/lib/civic-features";
-import type { WatchAuthorityCard, WatchdogSnapshot } from "@/lib/watchdog";
+import type { WatchAuthorityCard, WatchdogSnapshot, WatchPublicRecordFeedItem } from "@/lib/watchdog";
 
 type FeedFilter = "all" | "high" | "critical" | "video" | "review";
 
@@ -19,6 +19,7 @@ type Props = {
   wikiPages: WikiPageView[];
   snapshot: WatchdogSnapshot;
   authorities: WatchAuthorityCard[];
+  watchdogFeed: WatchPublicRecordFeedItem[];
   apiReady?: boolean;
 };
 
@@ -205,6 +206,7 @@ export function FrontPageLiveClient({
   wikiPages,
   snapshot,
   authorities,
+  watchdogFeed,
   apiReady = true,
 }: Props) {
   const [reports, setReports] = useState(initialReports);
@@ -524,6 +526,28 @@ export function FrontPageLiveClient({
                 </Link>
               ))}
             </div>
+          </article>
+
+          <article className="surface rounded-4xl p-6 md:p-8 tone-teal">
+            <p className="eyebrow">Senaste från övervakningsspegeln</p>
+            <div className="mt-5 space-y-3">
+              {watchdogFeed.length === 0 ? (
+                <p className="text-(--muted) text-sm leading-7">Automatiska registerposter visas här efter första ingestion-körningen.</p>
+              ) : (
+                watchdogFeed.slice(0, 3).map((item) => (
+                  <Link
+                    className="block rounded-3xl border border-[rgba(22,32,42,0.08)] bg-white/75 p-4 transition hover:-translate-y-0.5"
+                    href={item.officialId ? `/overvakningsspegeln/profil/${item.officialId}` : "/overvakningsspegeln"}
+                    key={item.id}
+                  >
+                    <p className="eyebrow">{item.category}</p>
+                    <h2 className="text-lg font-semibold">{item.title}</h2>
+                    <p className="mt-2 text-(--muted) text-sm leading-7">{item.summary.slice(0, 140)}{item.summary.length > 140 ? "…" : ""}</p>
+                  </Link>
+                ))
+              )}
+            </div>
+            <Link className="btn-secondary mt-6 w-full" href="/overvakningsspegeln">Öppna övervakningsspegeln</Link>
           </article>
 
           <article className="surface rounded-4xl p-6 md:p-8 tone-teal">

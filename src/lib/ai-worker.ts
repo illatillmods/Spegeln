@@ -98,6 +98,24 @@ export type AutomatedAppealResult = {
   artifacts: AutomatedAppealArtifact[];
 };
 
+export type WatchdogNormalizeRecordInput = {
+  title: string;
+  summary: string;
+  connectorKey?: string;
+  sourceKind?: string;
+  locale?: string;
+};
+
+export type WatchdogNormalizeRecordResult = {
+  category: string;
+  severity: string;
+  suggestedOfficialName?: string | null;
+  suggestedTitle?: string | null;
+  suggestedAuthoritySlug?: string | null;
+  entities: string[];
+  summary: string;
+};
+
 export type WorkerHealthResult = {
   status: "ok";
   service: string;
@@ -188,6 +206,7 @@ const supportedJobs = [
   "watchdog.triage_case",
   "watchdog.generate_press_release",
   "watchdog.reverse_surveillance",
+  "watchdog.normalize_record",
   "appeals.generate_bundle",
   "nlp.classify_document",
   "nlp.extract_entities",
@@ -425,6 +444,19 @@ export async function requestReverseSurveillancePlan(input: ReverseSurveillanceI
       summary: input.summary,
       locale: input.locale || "sv-SE",
       evidence: input.evidence,
+    },
+  );
+}
+
+export async function requestWatchdogNormalizeRecord(input: WatchdogNormalizeRecordInput): Promise<WatchdogNormalizeRecordResult> {
+  return callWorker(
+    "/v1/watchdog/normalize-record",
+    {
+      title: input.title,
+      summary: input.summary,
+      connector_key: input.connectorKey || "unknown",
+      source_kind: input.sourceKind || "PUBLIC_REGISTRY",
+      locale: input.locale || "sv-SE",
     },
   );
 }

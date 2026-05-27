@@ -58,9 +58,16 @@ import {
   getWatchdogAuthorities,
   getWatchdogPeople,
   getWatchdogProfile,
+  getWatchdogPublicFeed,
   getWatchdogSnapshot,
 } from "../../src/lib/watchdog";
 import { importWatchdogRows } from "../../src/lib/watchdog-import";
+import {
+  getIngestReviewQueue,
+  getIngestRunHistory,
+  listWatchdogConnectors,
+  runWatchdogOrchestrator,
+} from "../../src/lib/watchdog/orchestrator";
 import {
   authenticateEmailUser,
   clearOAuthStateCookie,
@@ -694,6 +701,28 @@ app.get("/api/watchdog/profiles/:id", async (c) => {
   return c.json(profile);
 });
 
+app.get("/api/watchdog/feed", async (c) => {
+  const { searchParams } = new URL(c.req.url);
+  const limit = Number(searchParams.get("limit") || "24");
+  const items = await getWatchdogPublicFeed(Number.isFinite(limit) ? limit : 24);
+  return c.json({ items, updatedAt: new Date().toISOString() });
+});
+
+app.get("/api/watchdog/profiles/:id/feed", async (c) => {
+  const prisma = getPrismaClient();
+  if (!prisma) {
+    return c.json({ items: [] });
+  }
+
+  const items = await prisma.publicRecord.findMany({
+    where: { officialId: c.req.param("id") },
+    orderBy: [{ publishedAt: "desc" }],
+    take: 20,
+  });
+
+  return c.json({ items, updatedAt: new Date().toISOString() });
+});
+
 app.post("/api/admin/watchdog/import", async (c) => {
   const user = await getSessionUser(c);
   if (!user || !requireRole(user, ["ADMIN", "ANALYST"])) {
@@ -716,6 +745,41 @@ app.post("/api/admin/watchdog/ingest-cron", async (c) => {
 
   try {
     const result = await runConfiguredWatchdogIngestion();
+    return c.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Ingestion misslyckades.";
+    return c.json({ error: message }, 500);
+  }
+});
+
+app.get("/api/admin/watchdog/ingest-status", async (c) => {
+  const user = await getSessionUser(c);
+  if (!user || !requireRole(user, ["ADMIN", "ANALYST"])) {
+    return c.json({ error: "Behörighet saknas." }, 403);
+  }
+
+  const [runs, connectors, reviewQueue] = await Promise.all([
+    getIngestRunHistory(30),
+    Promise.resolve(listWatchdogConnectors()),
+    getIngestReviewQueue(20),
+  ]);
+
+  return c.json({ runs, connectors, reviewQueue, updatedAt: new Date().toISOString() });
+});
+
+app.post("/api/admin/watchdog/ingest-run", async (c) => {
+  const user = await getSessionUser(c);
+  if (!user || !requireRole(user, ["ADMIN", "ANALYST"])) {
+    return c.json({ error: "Behörighet saknas." }, 403);
+  }
+
+  const payload = await c.req.json().catch(() => ({}));
+  const connectorKeys = Array.isArray(payload.connectorKeys)
+    ? payload.connectorKeys.filter((key: unknown) => typeof key === "string")
+    : undefined;
+
+  try {
+    const result = await runWatchdogOrchestrator({ connectorKeys });
     return c.json(result);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ingestion misslyckades.";
