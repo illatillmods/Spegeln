@@ -41,8 +41,10 @@ Frontend behöver inte egna databas- eller auth-hemligheter för att köra anvä
 
 ### Railway backend
 
-- Root directory: `backend`
-- Konfiguration: `backend/railway.json`
+- **Root directory: repo root** (not `backend/` — backend needs `prisma/` and `src/lib/` from the monorepo)
+- Build Command: `npm ci && npm ci --prefix backend && npm run backend:build`
+- Start Command: `npm run backend:start`
+- Konfiguration: `backend/railway.json` (healthcheck m.m.)
 - Viktiga miljövariabler:
   - `FRONTEND_URL`
   - `DATABASE_URL`

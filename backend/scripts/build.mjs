@@ -6,7 +6,23 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const backendRoot = path.resolve(__dirname, "..");
-const repoRoot = path.resolve(backendRoot, "..");
+const monorepoRoot = path.resolve(backendRoot, "..");
+const monorepoSchemaPath = path.join(monorepoRoot, "prisma", "schema.prisma");
+const monorepoSrcRoot = path.join(monorepoRoot, "src");
+
+const repoRoot = existsSync(monorepoSchemaPath) && existsSync(monorepoSrcRoot) ? monorepoRoot : null;
+
+if (!repoRoot) {
+  throw new Error(
+    [
+      "Backend build requires monorepo files (prisma/ and src/lib/).",
+      "In Railway: set the backend service Root Directory to the repository root (leave empty),",
+      "then set Build Command to: npm ci && npm ci --prefix backend && npm run backend:build",
+      "and Start Command to: npm run backend:start.",
+    ].join(" "),
+  );
+}
+
 const srcRoot = path.join(repoRoot, "src");
 
 function resolveTypeScriptModule(targetPath) {

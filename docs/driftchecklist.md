@@ -11,6 +11,11 @@ Obligatoriska miljövariabler per tjänst. Sätt dessa i Vercel (frontend) respe
 
 ## Backend (Railway)
 
+**Root Directory måste vara repo-roten**, inte `backend/`. Backend bundlar `src/lib/` och `prisma/` från monorepot.
+
+Build Command: `npm ci && npm ci --prefix backend && npm run backend:build`  
+Start Command: `npm run backend:start`
+
 | Variabel | Krävs | Syfte |
 |---|---|---|
 | `DATABASE_URL` | Ja | PostgreSQL via Prisma |

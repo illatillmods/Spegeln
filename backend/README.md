@@ -4,8 +4,16 @@ Separat Node.js-backend för Railway. Tjänsten kör auth, sessioncookies, admin
 
 ## Root i Railway
 
-- Sätt service root directory till `backend`.
-- `backend/railway.json` innehåller build-, start- och healthcheck-inställningar.
+Backend bygger mot delad kod i repo-roten (`prisma/`, `src/lib/`). **Sätt inte Root Directory till `backend`** — då saknas dessa filer i build-containern.
+
+### Railway (Nixpacks)
+
+1. Root Directory: **repo root** (lämna tomt eller `/`)
+2. Build Command: `npm ci && npm ci --prefix backend && npm run backend:build`
+3. Start Command: `npm run backend:start`
+4. Healthcheck: `/api/health`
+
+`backend/railway.json` gäller watchPatterns om du kör från repo-roten.
 
 ## Viktiga miljövariabler
 
