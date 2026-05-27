@@ -205,6 +205,8 @@ export function StartHub() {
       </section>
 
       <section className="space-y-5 reveal">
+        <div className="max-w-3xl">
+          <p className="eyebrow">Snabbvägar</p>
           <h2 className="mt-2 font-title text-4xl">Sidor som förklarar drivkraft, finansiering och hur du styr dina egna spår.</h2>
         </div>
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
